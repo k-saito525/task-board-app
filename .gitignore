@@ -1,0 +1,39 @@
+# --- OS / エディタ ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- 環境変数 ---
+.env
+.env.*
+!.env.example
+
+# --- Laravel (api/) ---
+/api/vendor/
+/api/storage/*.key
+/api/storage/framework/cache/data/*
+/api/storage/framework/sessions/*
+/api/storage/framework/testing/*
+/api/storage/framework/views/*
+/api/storage/logs/*
+/api/public/storage
+/api/bootstrap/cache/*.php
+/api/.phpunit.result.cache
+/api/.phpunit.cache/
+
+# Laravel Boost が boost:install のたびに再生成する設定
+/api/boost.json
+# .mcp.json はルートに手で配置し、コミット対象とする（再生成させない）
+
+# --- Next.js (web/) ---
+/web/node_modules/
+/web/.next/
+/web/out/
+/web/build/
+/web/.turbo/
+/web/next-env.d.ts
+/web/*.tsbuildinfo
+
+# web/src/lib/api/schema.d.ts は OpenAPI からの生成物だが、
+# 契約のずれを差分でレビューできるよう、あえてコミットする
