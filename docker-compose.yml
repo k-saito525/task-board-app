@@ -1,0 +1,38 @@
+# ローカル開発用。db と api を起動する。
+# フロント(web/)は HMR の速さを優先してホストで `npm run dev` する。
+#
+# 使い方:
+#   docker compose up -d          … db と api を起動
+#   docker compose exec api php artisan migrate
+#   docker compose logs -f api
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: taskboard
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: password
+    ports:
+      # ホストの psql / GUI クライアントから覗けるように公開する
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # api が「DB がまだ受付前」の状態で起動しないようにする
+      test: ["CMD-SHELL", "pg_isready -U app -d taskboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./api
+    volumes:
+      - ./api:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
