@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "cleanupPeriodDays": 7,
+
+  "enableAllProjectMcpServers": false,
+  "enabledMcpjsonServers": ["laravel-boost"],
+  "autoUploadSessions": false,
+  "disableRemoteControl": true,
+
+  "permissions": {
+    "defaultMode": "default",
+    "disableBypassPermissionsMode": "disable",
+
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git blame*)",
+      "Bash(git ls-files*)",
+      "Bash(git branch)",
+      "Bash(git remote -v)"
+    ],
+
+    "ask": [
+      "Edit(CLAUDE.md)",
+      "Write(CLAUDE.md)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+
+      "Read(api/.env)",
+      "Edit(api/.env)",
+      "Write(api/.env)",
+
+      "Bash(git push*)",
+      "Bash(git commit*)",
+      "Bash(gh pr *)",
+      "Bash(gh release *)",
+
+      "Bash(php artisan migrate:fresh*)",
+      "Bash(php artisan migrate:refresh*)",
+      "Bash(php artisan migrate:reset*)",
+      "Bash(php artisan db:wipe*)"
+    ],
+
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
+
+      "Bash(curl)",
+      "Bash(curl *)",
+      "Bash(wget)",
+      "Bash(wget *)",
+      "Bash(bash -c *)",
+      "Bash(/bin/bash -c *)",
+      "Bash(sh -c *)",
+      "Bash(/bin/sh -c *)",
+      "Bash(zsh -c *)",
+
+      "Bash(sudo *)",
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(chmod 777*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(docker compose down -v*)",
+      "Bash(docker volume rm*)"
+    ]
+  }
+}
