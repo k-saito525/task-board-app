@@ -3,9 +3,11 @@
 namespace Database\Factories;
 
 use App\Models\User;
+use App\Support\RecoveryCode;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use PragmaRX\Google2FA\Google2FA;
 
 /**
  * @extends Factory<User>
@@ -40,6 +42,30 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * シークレットを発行しただけの状態（認証アプリへの登録待ち）。この間 MFA は無効。
+     *
+     * シークレットは encrypted キャストで保存され、読み出すと復号される。テスト側は
+     * $user->two_factor_secret を Google2FA::getCurrentOtp() に渡して正しいコードを作る。
+     */
+    public function twoFactorPending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'two_factor_secret' => app(Google2FA::class)->generateSecretKey(32),
+        ]);
+    }
+
+    /**
+     * MFA が有効なユーザー。
+     */
+    public function twoFactorConfirmed(): static
+    {
+        return $this->twoFactorPending()->state(fn (array $attributes) => [
+            'two_factor_recovery_codes' => RecoveryCode::generateSet(),
+            'two_factor_confirmed_at' => now(),
         ]);
     }
 }

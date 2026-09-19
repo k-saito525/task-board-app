@@ -134,17 +134,19 @@ class AuthenticationTest extends TestCase
 
     /**
      * UserResource を許可リスト方式にしてある効果を固定する。
-     * Step 3b で two_factor_secret を users に追加するが、このテストがあれば
-     * 誤って応答に混ざった時点で落ちる。
+     *
+     * Step 3b で users に two_factor_secret / two_factor_recovery_codes を足した。
+     * 応答に出るのは派生値の two_factor_enabled だけで、シークレットそのものは
+     * 出ない。カラムが応答へ漏れ出せばこのテストがその場で落ちる。
      */
     public function test_me_returns_only_the_allowlisted_fields(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->twoFactorConfirmed()->create();
 
         $response = $this->actingAs($user, 'sanctum')->getJson('/api/auth/me');
 
         $this->assertSame(
-            ['id', 'name', 'email', 'created_at'],
+            ['id', 'name', 'email', 'two_factor_enabled', 'created_at'],
             array_keys($response->json()),
         );
     }
