@@ -64,6 +64,7 @@ curl -i localhost:8000/api/health                     # DB 接続込みの生存
 
 ## 作業の進め方
 
+0. **セッションの開始時は [docs/PROGRESS.md](docs/PROGRESS.md) の「現在地」を最初に読む。** どこまで終わっていて次に何をするかはそこに書いてある
 1. 作業は小さく区切る。1ステップ完了ごとに [docs/PROGRESS.md](docs/PROGRESS.md) を更新し、短く報告してから次へ進む
 2. ステップごとに `docs/worklog/step-NN-*.md` を書く。**詰まった点は「症状 / 調査の手順 / 原因 / 解決 / 技術メモ」に分解して残す**（詰まらなかった場合は「特になし」と明記する）
 3. PROGRESS.md 末尾の「詰まった点の索引」にも1行足す

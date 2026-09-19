@@ -4,6 +4,15 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 
 **各ステップの作業記録（やったこと・詰まった点の症状と原因と解決法・技術メモ）は [`worklog/`](./worklog/) に1ファイルずつ残す。** このファイルは一覧と索引に徹する。
 
+## 現在地
+
+- **完了**: Step 0 / 1 / 2 / 3a（基本認証）
+- **次の作業**: **Step 3b — MFA（TOTP）の登録・確認・解除**。手順は [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除未着手) に記載
+- **テスト**: 17 passed / 52 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: `main` と `origin/main` は同期済み。最新コミット `de44045`
+
+まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
+
 ## ステップ一覧
 
 | # | ステップ | 状態 | 完了条件 | 記録 |
@@ -11,7 +20,10 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 0 | リポジトリの初期整備 | ✅ 完了 | 環境確認、composer 更新、ドキュメント構成と .gitignore | [step-00](./worklog/step-00-setup.md) |
 | 1 | Docker Compose + Postgres + Laravel 雛形 | ✅ 完了 | `docker compose up -d` → `curl localhost:8000/api/health` が 200 | [step-01](./worklog/step-01-docker-laravel.md) |
 | 2 | マイグレーションとモデル | ✅ 完了 | 4テーブル作成、Enum とリレーション定義、Factory | [step-02](./worklog/step-02-schema-models.md) |
-| 3 | 認証（Sanctum トークン） | ⬜ 未着手 | register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401 | — |
+| 3 | 認証（Sanctum トークン） | 🚧 作業中 | 下の 3a / 3b / 3c をすべて満たす | [step-03](./worklog/step-03-authentication.md) |
+| 3a | └ 基本認証 | ✅ 完了 | register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401 | [step-03](./worklog/step-03-authentication.md#3a-基本認証) |
+| 3b | └ MFA の登録・確認・解除 | ⬜ 未着手 | 認証アプリに登録 → コード確認で有効化 → 解除。シークレットは暗号化して保存 | [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除未着手) |
+| 3c | └ ログインの2段階化 | ⬜ 未着手 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化未着手) |
 | 4 | プロジェクト CRUD + Policy | ⬜ 未着手 | 非メンバーからのアクセスが 404 | — |
 | 5 | メンバー管理 + ロール認可 | ⬜ 未着手 | member ロールが更新/削除で 403、最後の owner を外せない | — |
 | 6 | タスク CRUD + scopeBindings | ⬜ 未着手 | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | — |
@@ -34,6 +46,8 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | DB | PostgreSQL 17 |
 | スコープ | チーム共有ボード（`project_members` + owner/member ロール） |
 | 認証 | Sanctum API トークン（Bearer）＋ Next.js Route Handler を BFF にして httpOnly Cookie 保管 |
+| パスワード | 12文字以上＋漏洩リスト照合（`uncompromised()`）。文字種は強制しない |
+| 多要素認証 | TOTP（`pragmarx/google2fa`）+ リカバリコード。Step 3 で実装する |
 | 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成 |
 | API 設計 | Laravel 公式の道具が主軸（`apiResource` + `scopeBindings` / FormRequest / Policy / API Resource）＋ 複数ステップ処理のみ Action クラス |
 | ボード UI | 3カラム＋ボタンでステータス移動（D&D は完成後の拡張） |
@@ -52,6 +66,8 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 1 | Docker デーモンに繋がらない | `docker --version` は CLI の確認にすぎない。疎通は `docker info` で見る |
 | 1 | api コンテナだけ DB に繋がらない | `php artisan serve` は環境変数をホワイトリスト方式でしか子プロセスに渡さず、`DB_HOST` が対象外だった |
 | 1 | api が Up のまま応答せず停止もできない | コンテナのプロセス状態が壊れていた。Docker Desktop 再起動後、`down`（`-v` なし）→ `up -d` で復旧 |
+| 3a | 同じ Resource なのに `data` ラッパーが付いたり付かなかったりする | ラッパーは Resource がレスポンスの最上位にあるときだけ付く。配列に入れ子にすると付かない |
+| 3a | ログアウト後のトークンで `/me` が 200 を返す | 実装は正しく、テスト側の問題。1メソッド内でアプリが使い回され、認証ガードが解決済みのユーザーを保持していた |
 
 ## 設計ドキュメント
 

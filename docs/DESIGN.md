@@ -21,6 +21,7 @@
 | Backend | PHP 8.4 / Laravel 13 | 認可（Policy）・バリデーション（FormRequest）・レスポンス整形（API Resource）が標準で揃っており、API 専用構成に追加ライブラリをほぼ必要としない |
 | DB | PostgreSQL 17 | CHECK 制約・部分インデックス・JSONB など制約をDB側に寄せる手段が豊富。マネージドサービスの選択肢も多い |
 | 認証 | Sanctum API トークン（Bearer） | Laravel 標準。トークンを DB で管理するため**個別に失効できる**（JWT の自己完結トークンとの最大の差） |
+| 多要素認証 | TOTP（`pragmarx/google2fa`）+ リカバリコード | パスワードは長さを伸ばしても「漏れたら終わり」という性質が変わらない。所持要素を足して、パスワード単体では通らない状態にする |
 | Frontend | Next.js 16 (App Router) / TypeScript / Tailwind | Server Components からの取得を主軸にし、トークンをサーバー側に閉じ込められる |
 | 型共有 | Scramble で OpenAPI 3.1 生成 → `openapi-typescript` | コードから生成するため、アノテーションの書き忘れによる乖離が起きない |
 | Testing | PHPUnit（Feature 中心） | Laravel 同梱。HTTP から DB までを通して認可の振る舞いを検証できる |
@@ -65,7 +66,7 @@ task-board-app/
 
 | テーブル | カラム |
 |---|---|
-| `users` | id, name, email UNIQUE, password, timestamps |
+| `users` | id, name, email UNIQUE, password, two_factor_secret（暗号化・NULL可）, two_factor_recovery_codes（暗号化・NULL可）, two_factor_confirmed_at（NULL可）, timestamps |
 | `projects` | id, name, description, timestamps |
 | `project_members` | id, project_id, user_id, role, timestamps。**UNIQUE(project_id, user_id)** |
 | `tasks` | id, project_id, assignee_id（NULL可）, title, description, status, due_date, timestamps |
@@ -74,6 +75,7 @@ task-board-app/
 - `role` / `status` は文字列カラム + PHP の backed enum（`ProjectRole` = owner/member、`TaskStatus` = todo/in_progress/done）+ モデルの `casts`。DB 側にも CHECK 制約を付けて二重に守る
 - 外部キーは `ON DELETE CASCADE`
 - インデックス: `project_members(project_id, user_id)` UNIQUE、`tasks(project_id, status)`、`tasks(assignee_id)`
+- **`two_factor_confirmed_at` をシークレットとは別に持つ。** シークレットを保存した時点では MFA を有効にしない。認証アプリに登録できて実際にコードを1回通せたことを確認してから有効化しないと、登録に失敗したユーザーが自分のアカウントから締め出される
 
 ## REST API
 
@@ -84,6 +86,11 @@ POST   /api/auth/register
 POST   /api/auth/login                             → { token, user }
 POST   /api/auth/logout                            → currentAccessToken()->delete()
 GET    /api/auth/me
+
+POST   /api/auth/two-factor                        登録開始。otpauth:// URI とリカバリコードを返す
+POST   /api/auth/two-factor/confirm                コードを検証して有効化
+DELETE /api/auth/two-factor                        解除
+POST   /api/auth/two-factor-challenge              login のチャレンジ + コード → 本トークン
 
 GET    /api/projects                               自分がメンバーのもののみ
 POST   /api/projects
@@ -124,6 +131,9 @@ Laravel 公式が章立てで提供している専用クラスを主軸に据え
 3. **認可判定は Policy に集約** — `project_members.role` を読むのは `ProjectPolicy` / `TaskPolicy` のみ。Controller は `$this->authorize(...)` を呼ぶだけ
 4. **API Resource + `whenLoaded()`** — リレーションが読み込み済みのときだけ出力し N+1 を防ぐ。`paginate()` と組めばページネーションのメタが自動で付く
 5. **トークンの有効期限** — `config/sanctum.php` の `expiration` を設定する。トークンは DB にあるため個別失効が可能
+6. **出力は許可リストで固定する** — API Resource に出すフィールドだけを列挙する。モデルの `#[Hidden]`（拒否リスト）はカラム追加のたびに書き足す必要があるが、Resource は書いていない項目が出ない。`two_factor_secret` のような値を取りこぼさない
+7. **パスワードポリシーは `Password::defaults()` に集約する** — 各 FormRequest に `min:12` を直書きせず、登録・リセット・変更で条件がずれない状態を作る。12文字以上＋漏洩リスト照合（`uncompromised()`）とし、文字種は強制しない（NIST SP 800-63B）
+8. **`JsonResource::withoutWrapping()`** — `data` ラッパーは Resource が最上位にあるときだけ付き、配列に入れ子にすると付かない。同じオブジェクトの形が場所によってずれるため外す
 
 ## Next.js 側の構成
 
@@ -158,6 +168,7 @@ App Router の Server Components を主軸にデータを取得し、変更は S
 - D&D による並び替え（`position` の採番設計・楽観的更新）
 - タスクのコメント、ラベル、添付ファイル、活動ログ
 - リフレッシュトークンのライフサイクル、Sanctum の abilities によるトークンスコープ
+- **ユーザー列挙の遮断** — ログインの応答は揃えたが、応答時間の差と、登録時の `unique:users,email` 検証が「登録済みかどうか」を伝えてしまう。塞ぐには登録導線ごと変える必要がある
 - メール通知（招待メール等）、パスワードリセット
 - WebSocket / SSE によるリアルタイム更新
 - 本番デプロイ（Vercel + Fly.io/Render + マネージド Postgres）
@@ -169,6 +180,7 @@ App Router の Server Components を主軸にデータを取得し、変更は S
 
 - **Step 1**: `docker compose up -d` → `curl localhost:8000/api/health`、`docker compose exec db psql -U app -d taskboard -c '\dt'`
 - **Step 3〜6**: curl で一連の流れを確認。特に**他ユーザー・非メンバーからのアクセスが 403/404 になること**を毎回確認する
+- **Step 3b・3c**: 認証アプリ（`otpauth://` URI を QR 化）で登録 → コードで有効化 → ログインが2段階になる → リカバリコードで1回だけ通る
 - **Step 8〜11**: ブラウザで「登録 → プロジェクト作成 → タスク作成 → ステータス移動 → メンバー招待 → 別アカウントで確認」を手動で通す
 - **Step 12**: `docker compose exec api php artisan test`
 - **Step 13**: GitHub に push して Actions が緑になること
