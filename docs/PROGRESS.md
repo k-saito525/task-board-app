@@ -6,10 +6,10 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 
 ## 現在地
 
-- **完了**: Step 0 / 1 / 2 / 3a（基本認証） / 3b（MFA の登録・確認・解除）
-- **次の作業**: **Step 3c — ログインの2段階化**。手順は [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化未着手) に記載。**最初にレート制限を入れる**（この API には現在一切かかっていない。6桁のコードを無制限に試せる状態でチャレンジを公開できない）
-- **テスト**: 33 passed / 110 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: 3b は feat `ac79589` / test `712a79c` / docs の3コミット。**`origin/main`（`de44045`）へは未 push**
+- **完了**: Step 0 / 1 / 2 / 3a（基本認証） / 3b（MFA の登録・確認・解除） / 3c-0（レート制限）
+- **次の作業**: **Step 3c-1 — ログインの2段階化**。手順は [step-03](./worklog/step-03-authentication.md#3c-1-以降未着手) に記載。チャレンジには `throttle:two-factor-code`（5回/分＋30回/日）をかける
+- **テスト**: 39 passed / 188 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: 3b は feat `ac79589` / test `712a79c` / docs の3コミット。3c-0 は未コミット。**`origin/main`（`de44045`）へは未 push**
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
@@ -23,7 +23,9 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 3 | 認証（Sanctum トークン） | 🚧 作業中 | 下の 3a / 3b / 3c をすべて満たす | [step-03](./worklog/step-03-authentication.md) |
 | 3a | └ 基本認証 | ✅ 完了 | register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401 | [step-03](./worklog/step-03-authentication.md#3a-基本認証) |
 | 3b | └ MFA の登録・確認・解除 | ✅ 完了 | 認証アプリに登録 → コード確認で有効化 → 解除。シークレットは暗号化して保存 | [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除) |
-| 3c | └ ログインの2段階化 | ⬜ 未着手 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化未着手) |
+| 3c | └ ログインの2段階化 | 🚧 作業中 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化) |
+| 3c-0 | 　└ レート制限 | ✅ 完了 | 全体 60回/分、認証 10回/分、コード検証 5回/分＋30回/日 | [step-03](./worklog/step-03-authentication.md#3c-0-レート制限完了) |
+| 3c-1 | 　└ チャレンジ → 本トークン発行 | ⬜ 未着手 | TOTP / リカバリコードの検証を通ると本トークンが出る。コードは使い回せない | [step-03](./worklog/step-03-authentication.md#3c-1-以降未着手) |
 | 4 | プロジェクト CRUD + Policy | ⬜ 未着手 | 非メンバーからのアクセスが 404 | — |
 | 5 | メンバー管理 + ロール認可 | ⬜ 未着手 | member ロールが更新/削除で 403、最後の owner を外せない | — |
 | 6 | タスク CRUD + scopeBindings | ⬜ 未着手 | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | — |
@@ -48,6 +50,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 認証 | Sanctum API トークン（Bearer）＋ Next.js Route Handler を BFF にして httpOnly Cookie 保管 |
 | パスワード | 12文字以上＋漏洩リスト照合（`uncompromised()`）。文字種は強制しない |
 | 多要素認証 | TOTP（`pragmarx/google2fa`）+ リカバリコード。Step 3 で実装する |
+| レート制限 | 全体 60回/分、パスワード検証 10回/分、コード検証 5回/分＋30回/日。認証済みはユーザー単位、未認証は IP 単位で数える |
 | 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成 |
 | API 設計 | Laravel 公式の道具が主軸（`apiResource` + `scopeBindings` / FormRequest / Policy / API Resource）＋ 複数ステップ処理のみ Action クラス |
 | ボード UI | 3カラム＋ボタンでステータス移動（D&D は完成後の拡張） |
@@ -69,6 +72,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 3a | 同じ Resource なのに `data` ラッパーが付いたり付かなかったりする | ラッパーは Resource がレスポンスの最上位にあるときだけ付く。配列に入れ子にすると付かない |
 | 3a | ログアウト後のトークンで `/me` が 200 を返す | 実装は正しく、テスト側の問題。1メソッド内でアプリが使い回され、認証ガードが解決済みのユーザーを保持していた |
 | 3b | 実装をわざと壊しても1つも落ちない経路があった | テストの穴。「確認待ちの登録はやり直せる」という仕様をテストに書いていなかった |
+| 3c-0 | 同じく壊しても落ちなかったが、今回はテストの穴ではなかった | 積んだ上限のキー重複は `RateLimiter` が `fallbackKey()` で自動的に分ける。手で付けた接頭辞が無意味だった（削除） |
 
 ## 設計ドキュメント
 
