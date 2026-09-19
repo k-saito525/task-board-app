@@ -6,10 +6,10 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 
 ## 現在地
 
-- **完了**: Step 0 / 1 / 2 / 3a（基本認証）
-- **次の作業**: **Step 3b — MFA（TOTP）の登録・確認・解除**。手順は [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除未着手) に記載
-- **テスト**: 17 passed / 52 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: `main` と `origin/main` は同期済み。最新コミット `de44045`
+- **完了**: Step 0 / 1 / 2 / 3a（基本認証） / 3b（MFA の登録・確認・解除）
+- **次の作業**: **Step 3c — ログインの2段階化**。手順は [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化未着手) に記載。**最初にレート制限を入れる**（この API には現在一切かかっていない。6桁のコードを無制限に試せる状態でチャレンジを公開できない）
+- **テスト**: 33 passed / 110 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: 3b は feat `ac79589` / test `712a79c` / docs の3コミット。**`origin/main`（`de44045`）へは未 push**
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
@@ -22,7 +22,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 2 | マイグレーションとモデル | ✅ 完了 | 4テーブル作成、Enum とリレーション定義、Factory | [step-02](./worklog/step-02-schema-models.md) |
 | 3 | 認証（Sanctum トークン） | 🚧 作業中 | 下の 3a / 3b / 3c をすべて満たす | [step-03](./worklog/step-03-authentication.md) |
 | 3a | └ 基本認証 | ✅ 完了 | register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401 | [step-03](./worklog/step-03-authentication.md#3a-基本認証) |
-| 3b | └ MFA の登録・確認・解除 | ⬜ 未着手 | 認証アプリに登録 → コード確認で有効化 → 解除。シークレットは暗号化して保存 | [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除未着手) |
+| 3b | └ MFA の登録・確認・解除 | ✅ 完了 | 認証アプリに登録 → コード確認で有効化 → 解除。シークレットは暗号化して保存 | [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除) |
 | 3c | └ ログインの2段階化 | ⬜ 未着手 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化未着手) |
 | 4 | プロジェクト CRUD + Policy | ⬜ 未着手 | 非メンバーからのアクセスが 404 | — |
 | 5 | メンバー管理 + ロール認可 | ⬜ 未着手 | member ロールが更新/削除で 403、最後の owner を外せない | — |
@@ -68,6 +68,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 1 | api が Up のまま応答せず停止もできない | コンテナのプロセス状態が壊れていた。Docker Desktop 再起動後、`down`（`-v` なし）→ `up -d` で復旧 |
 | 3a | 同じ Resource なのに `data` ラッパーが付いたり付かなかったりする | ラッパーは Resource がレスポンスの最上位にあるときだけ付く。配列に入れ子にすると付かない |
 | 3a | ログアウト後のトークンで `/me` が 200 を返す | 実装は正しく、テスト側の問題。1メソッド内でアプリが使い回され、認証ガードが解決済みのユーザーを保持していた |
+| 3b | 実装をわざと壊しても1つも落ちない経路があった | テストの穴。「確認待ちの登録はやり直せる」という仕様をテストに書いていなかった |
 
 ## 設計ドキュメント
 

@@ -1,7 +1,7 @@
 # Step 3: 認証（Sanctum トークン）
 
 - **日付**: 2026-09-19
-- **状態**: 🚧 作業中（3a 完了 / 3b・3c 未着手）
+- **状態**: 🚧 作業中（3a・3b 完了 / 3c 未着手）
 - **完了条件**: register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401。加えて MFA（TOTP）の登録・確認・解除と、ログインの2段階化
 
 ## 分割
@@ -11,7 +11,7 @@
 | | 内容 | 状態 |
 |---|---|---|
 | 3a | 基本認証（register / login / me / logout） | ✅ 完了 |
-| 3b | MFA の登録・確認・解除（TOTP） | ⬜ 未着手 |
+| 3b | MFA の登録・確認・解除（TOTP） | ✅ 完了 |
 | 3c | ログインの2段階化（チャレンジ → 本トークン発行） | ⬜ 未着手 |
 
 ---
@@ -195,26 +195,185 @@ api/
 
 ---
 
-## 3b: MFA の登録・確認・解除（未着手）
+## 3b: MFA の登録・確認・解除
 
-1. `users` に `two_factor_secret` / `two_factor_recovery_codes` / `two_factor_confirmed_at` を追加する。**シークレットは暗号化して保存**（`encrypted` キャスト）
-2. `pragmarx/google2fa` を導入（TOTP の生成・検証）
-3. エンドポイント3本 — 登録開始（`otpauth://` URI を返す）／コード確認（`two_factor_confirmed_at` を立てる）／解除
-4. リカバリコードの生成と、使用時の消し込み
+### やったこと
 
-QR 画像はバックエンドで生成せず `otpauth://` URI を返す。画像化はフロント側の責務（Step 8）。
+#### 1. 状態を3カラムで持つ
 
-`two_factor_confirmed_at` を分けるのは、**シークレットを保存した時点ではまだ有効化しない**ため。ユーザーが認証アプリに登録し、実際にコードを1回通せたことを確認してから有効にしないと、登録に失敗したユーザーが自分のアカウントから締め出される。
+```php
+$table->text('two_factor_secret')->nullable();          // 認証アプリと共有する鍵
+$table->text('two_factor_recovery_codes')->nullable();  // 使い捨てコード
+$table->timestamp('two_factor_confirmed_at')->nullable();
+```
+
+`two_factor_confirmed_at` を分けたのが設計の中心。**シークレットを保存した時点ではまだ有効化しない。** 保存＝有効化にすると、認証アプリへの登録に失敗したユーザー（QR を読む前に画面を閉じた、別端末に入れたつもりで入っていない）が次のログインで自分のアカウントから締め出される。実際にコードを1回通せたことを確認してから有効にする。
+
+これで状態が3つになる。
+
+| 状態 | `two_factor_secret` | `two_factor_confirmed_at` | MFA |
+|---|---|---|---|
+| 未登録 | `null` | `null` | 無効 |
+| 確認待ち | あり | `null` | **無効** |
+| 有効 | あり | あり | 有効 |
+
+`User::hasTwoFactorEnabled()` は `confirmed_at` だけを見る。シークレットの有無で判定すると「確認待ち」が有効側に転ぶ。
+
+型を `string` ではなく `text` にしたのは暗号化のため。`encrypted` キャストの保存値は `iv` / `value` / `mac` を持つ JSON を Base64 化したもので、元の長さの数倍になる。リカバリコード8件の配列は 255 文字に収まらない。
+
+#### 2. シークレットは暗号化して保存する
+
+```php
+'two_factor_secret' => 'encrypted',
+'two_factor_recovery_codes' => 'encrypted:array',
+```
+
+パスワードの `hashed` とは別物で、`encrypted` は `APP_KEY` による**可逆な**暗号化。TOTP の検証には鍵の平文が必要なのでハッシュ化はできない。狙いは「DB だけが漏れた場合に読めないこと」で、`APP_KEY` ごと漏れれば読める。
+
+`#[Hidden]` にも両カラムを足した。API が返す項目は `UserResource`（許可リスト）が正で、`#[Hidden]` は API を通らない経路（ログ出力、`dd`、キューのペイロード）でモデルがそのまま配列化されるときの保険。**守る対象が「応答の仕様」と「不注意な直列化」で違う**ので二重に書いている。
+
+#### 3. TOTP の生成・検証は `pragmarx/google2fa`
+
+QR 画像は作らない。`otpauth://` URI を返して画像化はフロントの責務にする（Step 8）。表示の都合で解像度や配色は変わるが URI は変わらないため、バックエンドが持つ理由がない。手入力したいユーザー向けにシークレット自体も返す。どちらも同じ鍵を運ぶ。
+
+鍵は 32 文字の Base32 = 160 ビットで生成した。RFC 6238 が HMAC-SHA1 の鍵長として推奨する値。
+
+#### 4. エンドポイントは4本
+
+| メソッド | パス | 本文 | 応答 |
+|---|---|---|---|
+| POST | `/api/auth/two-factor` | `password` | 201 `{ secret, otpauth_uri }` |
+| POST | `/api/auth/two-factor/confirm` | `code` | 200 `{ recovery_codes }` |
+| POST | `/api/auth/two-factor/recovery-codes` | `password` | 200 `{ recovery_codes }` |
+| DELETE | `/api/auth/two-factor` | `password` | 204 |
+
+`apiResource` にしない。ユーザーごとに1つしかなく id で指すものがない（コレクションではない）ため。
+
+状態の遷移を伴う処理は Action クラスに置いた（`app/Actions/TwoFactor/`）。Controller は状態の検査と応答の組み立てだけを行う。
+
+#### 5. 設定変更に現在のパスワードを要求する
+
+```php
+'password' => ['required', 'string', 'current_password:sanctum'],
+```
+
+有効化・解除・リカバリコードの再発行はトークンだけでは通さない。**トークンを盗んだ相手が MFA を解除できるなら、MFA を足す意味がなくなる。** 所持要素を外す操作は知識要素で再確認する。
+
+ガードを `:sanctum` と明示した。`auth:sanctum` ミドルウェアは認証が通ったときに `shouldUse('sanctum')` を呼ぶので省略しても動くが、それに頼ると認証の設定を変えたときに照合先が静かにずれる。
+
+`Password::defaults()` は適用しない。ログインと同じ理由で、既存ユーザーの正しいパスワードを形式で弾いてはならない。
+
+#### 6. リカバリコードは確認が済んでから発行する
+
+有効化とコード発行を同じ1回の保存にまとめた。**「有効だがリカバリコードが無い」状態を作らないため。** 認証アプリを失えばその状態は復旧不能になる。逆に確認前に発行しても、MFA が無効なうちはコードの使い道がない。
+
+1コードは英数20文字（`Str::random(10).'-'.Str::random(10)`）。`Str::random()` は `random_bytes()` 由来なので予測できない。62種類から20文字で約119ビット。ハイフンで割るのは読み上げ・書き写しのしやすさのためで、検証では区切りも含めて1つのコードとして扱う。
+
+#### 7. 手順を飛ばした呼び出しは 409、入力の誤りは 422
+
+| 呼び出し | 応答 |
+|---|---|
+| 有効なのに再度 有効化 | 409（黙って別の鍵に差し替えない） |
+| 確認待ちのまま 有効化 | 201（**やり直せる**。QR を読む前に閉じたユーザーが詰まる） |
+| 登録を始めずに 確認 | 409 |
+| MFA 無効で コード再発行 | 409 |
+| 未登録で 解除 | 204（結果の状態は同じで、409 にしても呼び出し側にできることがない） |
+| コードが6桁でない / 一致しない | 422 |
+
+409 と 422 を分ける基準は「同じリクエストを送り直せば解決するか」。状態の不一致は送り直しても解決しないので 409、入力の誤りは直せるので 422。
+
+#### 8. `/me` は状態だけを返す
+
+```php
+'two_factor_enabled' => $this->hasTwoFactorEnabled(),
+```
+
+設定画面の表示と「解除ボタンを出すか」の判断に必要な情報はこれで足りる。シークレットは出さない。
+
+3a で書いた「`/me` のキーを固定するテスト」がここで効いた。カラムを足した時点でテストが落ち、**応答に何を足すかを明示的に決めさせられた**（`two_factor_enabled` を1件足して期待値を更新）。テストが黙って通っていたら、決めずに済ませていた。
+
+#### 9. テスト
+
+`tests/Feature/Auth/TwoFactorAuthenticationTest.php` に16件。見ているのは次の3点。
+
+- シークレットが平文で DB に残らないこと
+- 確認が済むまで MFA が有効にならないこと
+- 現在のパスワード無しで設定を変えられないこと
+
+暗号化の検証は `DB::table('users')->value('two_factor_secret')` でカラムを直接読む。Eloquent 経由では `encrypted` キャストが復号してしまい、平文との違いが見えない。
+
+正しいコードは `Google2FA::getCurrentOtp($user->two_factor_secret)` で作る。`encrypted` キャストは読み出し時に復号するので、Factory で入れた鍵をテスト側からそのまま使える（`twoFactorPending()` / `twoFactorConfirmed()` の2状態を追加した）。
+
+**全33件・110アサーションがパス。** Pint も通っている。
+
+### 詰まった点
+
+**特になし。** 実装・テストともに一度で通った。
+
+### テストが正しいことの確認
+
+3a と同じく、実装をわざと壊して検知できるかを確かめた。
+
+| 壊した箇所 | 落ちたテスト | 判定 |
+|---|---|---|
+| `current_password:sanctum` を外す | パスワード確認の3件のみ | 期待どおり |
+| 有効化で `confirmed_at` も立てる（保存＝有効化） | 確認前は無効であることのテストのみ | 期待どおり |
+| `two_factor_secret` の `encrypted` キャストを外す | 暗号化のテストのみ | 期待どおり |
+| 解除で `confirmed_at` だけを消す | 解除のテストのみ | 期待どおり |
+| `hasTwoFactorEnabled()` を `secret !== null` に変える | 確認前は無効 / 誤ったコード / `/me` の3件 | 期待どおり |
+
+最後の1つで**テストの穴が1つ見つかった。** この破壊を入れると「確認待ちのユーザーが有効化をやり直す」経路が 409 になるのに、どのテストも落ちなかった。やり直せることは意図した仕様（QR を読む前に画面を閉じたユーザーが先へ進めなくなる）なので、テストを1件追加した（`enabling again while pending replaces the secret`）。**壊して初めて「書いていない仕様」に気づけた**例。
+
+### 判断メモ
+
+- **リカバリコードはハッシュ化せず暗号化で保存した。** ハッシュ化すれば DB から読めなくなる分強いが、再表示ができなくなる。今回は発行直後の応答でしか平文を渡さない設計なので再表示は元から無く、ハッシュ化の余地はある。Fortify と同じ「暗号化」に合わせたうえで、将来 UI で控えを見せたくなったときに選択肢を残した
+- **コードの使い回し（リプレイ）は塞いでいない。** `verifyKey` は前後1ステップ（±30秒）を許容するため、同じコードは最大90秒間通る。`google2fa` には `verifyKeyNewer($secret, $code, $oldTimestamp)` があり、一致したステップの timestamp を返すので、最後に使ったステップを保存すれば「同じコードは二度通らない」を実現できる。**3b では確認（1回きり）にしか検証を使わないので影響がなく、3c のログイン検証で入れる**
+- **レート制限は未実装。** `bootstrap/app.php` で `throttleApi()` を呼んでいないため、この API には現在レート制限が一切かかっていない（`Middleware::$apiLimiter` が null だと `throttle:` ミドルウェアがグループに入らない）。6桁 = 100万通りの TOTP を無制限に試せる状態は 3c のログイン検証で致命的になる。**3c の最初に入れる**
+- **`code` の検証は `digits:6`。** `integer` や `numeric` を付けると先頭が 0 のコードが落ちる。`digits` は文字列として「数字以外を含まない」かつ「桁数が一致」を見る
+- **コードの比較は `hash_equals`**（`google2fa` の `findValidOTP` 内）。総当たりの手がかりになる時間差が出ない
+
+### 成果物
+
+```
+api/
+├── app/
+│   ├── Actions/TwoFactor/
+│   │   ├── EnableTwoFactorAuthentication.php    (新規・登録開始)
+│   │   ├── ConfirmTwoFactorAuthentication.php   (新規・確認して有効化)
+│   │   ├── DisableTwoFactorAuthentication.php   (新規・解除)
+│   │   └── RegenerateRecoveryCodes.php          (新規・コード再発行)
+│   ├── Http/
+│   │   ├── Controllers/Api/TwoFactorAuthenticationController.php (新規)
+│   │   ├── Requests/Auth/PasswordConfirmationRequest.php         (新規)
+│   │   ├── Requests/Auth/ConfirmTwoFactorRequest.php             (新規)
+│   │   └── Resources/UserResource.php           (two_factor_enabled)
+│   ├── Models/User.php                          (キャスト / Hidden / hasTwoFactorEnabled)
+│   └── Support/RecoveryCode.php                 (新規)
+├── database/
+│   ├── factories/UserFactory.php                (twoFactorPending / twoFactorConfirmed)
+│   └── migrations/2026_09_19_140739_add_two_factor_columns_to_users_table.php (新規)
+├── routes/api.php                               (two-factor グループ)
+└── tests/Feature/Auth/
+    ├── TwoFactorAuthenticationTest.php          (新規・16件)
+    └── AuthenticationTest.php                   (/me の期待キーを更新)
+```
+
+依存の追加: `pragmarx/google2fa` ^9.1
+
+コミット: `ac79589`（実装）→ `712a79c`（テスト）→ この記録
 
 ## 3c: ログインの2段階化（未着手）
 
 MFA が有効なユーザーのログインを2段階にする。
 
+0. **レート制限を入れる。** 現状この API には一切かかっていない。6桁のコードを無制限に試せる状態でチャレンジを公開してはならない
 1. `POST /api/auth/login` は本トークンを返さず、短命のチャレンジ（MFA 待ち）を返す
 2. `POST /api/auth/two-factor-challenge` で TOTP コードかリカバリコードを検証し、通ったら本トークンを発行する
+3. リカバリコードは使ったら消し込む（1コード1回）
+4. TOTP は `verifyKeyNewer()` で使い回しを塞ぐ（最後に通ったステップを保存する）
 
 MFA が無効なユーザーは従来どおり1回で本トークンを受け取る。
 
 ## 次のステップ
 
-Step 3b: MFA の登録・確認・解除
+Step 3c: ログインの2段階化
