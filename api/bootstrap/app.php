@@ -13,7 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // API 全体にレート制限をかける。Laravel 11 以降、これを呼ばない限り
+        // throttle ミドルウェアは api グループに入らない（= 制限が一切かからない）。
+        // 上限の内容は AppServiceProvider の名前付きリミッター 'api' 側で定義する。
+        // 対の定義が無いと MissingRateLimiterException で全リクエストが落ちるので、
+        // この呼び出しとリミッターの定義は必ずセットで置く。
+        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -29,8 +29,12 @@ Route::get('/health', function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('auth')->group(function () {
-    Route::post('register', [AuthController::class, 'register']);
-    Route::post('login', [AuthController::class, 'login']);
+    // パスワードを検証する入口。API 全体の 60回/分（throttle:api）より内側に、
+    // 10回/分の枠をもう1つ重ねる。上限の定義は AppServiceProvider にある。
+    Route::middleware('throttle:auth')->group(function () {
+        Route::post('register', [AuthController::class, 'register']);
+        Route::post('login', [AuthController::class, 'login']);
+    });
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
@@ -44,10 +48,16 @@ Route::prefix('auth')->group(function () {
         | 有効化・解除・リカバリコードの再発行は現在のパスワードを要求する。
         */
         Route::prefix('two-factor')->group(function () {
-            Route::post('/', [TwoFactorAuthenticationController::class, 'store']);
-            Route::post('confirm', [TwoFactorAuthenticationController::class, 'confirm']);
-            Route::post('recovery-codes', [TwoFactorAuthenticationController::class, 'recoveryCodes']);
-            Route::delete('/', [TwoFactorAuthenticationController::class, 'destroy']);
+            // 6桁のコードを検証する場所。鍵空間が狭いので制限も別枠にする
+            Route::post('confirm', [TwoFactorAuthenticationController::class, 'confirm'])
+                ->middleware('throttle:two-factor-code');
+
+            // 現在のパスワードを検証する3本
+            Route::middleware('throttle:auth')->group(function () {
+                Route::post('/', [TwoFactorAuthenticationController::class, 'store']);
+                Route::post('recovery-codes', [TwoFactorAuthenticationController::class, 'recoveryCodes']);
+                Route::delete('/', [TwoFactorAuthenticationController::class, 'destroy']);
+            });
         });
     });
 });

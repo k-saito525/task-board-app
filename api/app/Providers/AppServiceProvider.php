@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -16,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configurePasswordPolicy();
+        $this->configureRateLimiting();
 
         // Resource の "data" ラッパーを外す。
         //
@@ -46,5 +50,55 @@ class AppServiceProvider extends ServiceProvider
         Password::defaults(fn () => $this->app->runningUnitTests()
             ? Password::min(12)
             : Password::min(12)->uncompromised());
+    }
+
+    /**
+     * レート制限を定義する。ここと bootstrap/app.php の throttleApi() は対で、
+     * どちらか片方だけでは機能しない（片方だけだと全リクエストが 500 になる）。
+     *
+     * 3段構えにする。守る対象が違うため上限値も分ける。
+     *
+     *   api             … 全体の保護。素朴な連打や暴走したクライアントを止める
+     *   auth            … パスワードを検証する場所（登録・ログイン・MFA の設定変更）
+     *   two-factor-code … 6桁のコードを検証する場所
+     *
+     * 認証済みのルートではユーザー単位、未認証のルートでは IP 単位で数える。
+     * ミドルウェアの優先順位は auth が throttle より先なので、認証が必要なルートでは
+     * リミッターが呼ばれる時点でユーザーが解決済み（未認証は 401 で、制限の枠を
+     * 消費しない）。IP 単位だけにすると、同じ IP を共有する利用者（NAT・社内網）が
+     * 互いの枠を食い合う。
+     */
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)
+            ->by($this->rateLimitKey($request)));
+
+        // パスワードを当てにくる場所。通常の利用で毎分10回に達することはない。
+        //
+        // ただし毎分の制限だけで総当たりを止められるわけではない（10/分 =
+        // 14,400/日）。パスワードを守っているのは主に12文字以上と漏洩リストとの
+        // 照合であって、ここは速度を落として「気づく時間」を稼ぐ層にすぎない。
+        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)
+            ->by($this->rateLimitKey($request)));
+
+        // コードは6桁 = 100万通りしかなく、パスワードのような鍵空間の広さに頼れない。
+        // 毎分の上限だけでは1日に7,200回試せてしまうため、日単位の上限を重ねる。
+        // 30回/日なら当たる確率は1日あたり約10万分の1（前後1ステップの許容を含む）。
+        //
+        // 2つの上限が同じ by() を持ってもカウンターは混ざらない。RateLimiter::limiter()
+        // がキーの重複を検出し、上限値と期間を含むキー（Limit::fallbackKey()）に
+        // 差し替える。手で接頭辞を付ける必要はない。
+        RateLimiter::for('two-factor-code', fn (Request $request) => [
+            Limit::perMinute(5)->by($this->rateLimitKey($request)),
+            Limit::perDay(30)->by($this->rateLimitKey($request)),
+        ]);
+    }
+
+    /**
+     * 制限を数える単位。認証済みならユーザー、未認証なら IP。
+     */
+    private function rateLimitKey(Request $request): string
+    {
+        return (string) ($request->user()?->id ?? $request->ip());
     }
 }
