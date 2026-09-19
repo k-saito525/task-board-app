@@ -17,6 +17,8 @@ services:
       - "5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
+      # テスト用 DB を作る。ボリュームが空のときだけ実行される
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # api が「DB がまだ受付前」の状態で起動しないようにする
       test: ["CMD-SHELL", "pg_isready -U app -d taskboard"]
@@ -33,6 +35,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # php artisan serve はホストのスリープ後などに応答しなくなることがある。
+    # Up のまま無反応になる状態を検知して復帰させる。
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   db-data:
