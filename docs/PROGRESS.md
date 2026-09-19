@@ -9,7 +9,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 - **完了**: Step 0 / 1 / 2 / 3a（基本認証） / 3b（MFA の登録・確認・解除） / 3c-0（レート制限）
 - **次の作業**: **Step 3c-1 — ログインの2段階化**。手順は [step-03](./worklog/step-03-authentication.md#3c-1-以降未着手) に記載。チャレンジには `throttle:two-factor-code`（5回/分＋30回/日）をかける
 - **テスト**: 39 passed / 188 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: 3b は feat `ac79589` / test `712a79c` / docs の3コミット。3c-0 は未コミット。**`origin/main`（`de44045`）へは未 push**
+- **リポジトリ**: `main` と `origin/main` は同期済み。3b は feat `ac79589` / test `712a79c` / docs、3c-0 は feat `61b6943` / test `114da39` / docs の各3コミット
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
