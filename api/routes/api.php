@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -34,5 +35,19 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
+
+        /*
+        | MFA（TOTP）
+        |
+        | 登録開始 → コード確認で有効化 → 解除。apiResource にしないのは、ユーザーごとに
+        | 1つしかなく id で指すものがないため（コレクションではない）。
+        | 有効化・解除・リカバリコードの再発行は現在のパスワードを要求する。
+        */
+        Route::prefix('two-factor')->group(function () {
+            Route::post('/', [TwoFactorAuthenticationController::class, 'store']);
+            Route::post('confirm', [TwoFactorAuthenticationController::class, 'confirm']);
+            Route::post('recovery-codes', [TwoFactorAuthenticationController::class, 'recoveryCodes']);
+            Route::delete('/', [TwoFactorAuthenticationController::class, 'destroy']);
+        });
     });
 });

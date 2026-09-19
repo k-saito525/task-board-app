@@ -27,6 +27,11 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+
+            // シークレットではなく「有効かどうか」だけを出す。設定画面の表示と、
+            // 解除ボタンを出すかどうかの判断に必要な情報はこれで足りる。
+            'two_factor_enabled' => $this->hasTwoFactorEnabled(),
+
             'created_at' => $this->created_at,
         ];
     }
