@@ -10,7 +10,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 |---|---|---|---|---|
 | 0 | リポジトリの初期整備 | ✅ 完了 | 環境確認、composer 更新、ドキュメント構成と .gitignore | [step-00](./worklog/step-00-setup.md) |
 | 1 | Docker Compose + Postgres + Laravel 雛形 | ✅ 完了 | `docker compose up -d` → `curl localhost:8000/api/health` が 200 | [step-01](./worklog/step-01-docker-laravel.md) |
-| 2 | マイグレーションとモデル | ⬜ 未着手 | 4テーブル作成、Enum とリレーション定義、Factory/Seeder | — |
+| 2 | マイグレーションとモデル | ✅ 完了 | 4テーブル作成、Enum とリレーション定義、Factory | [step-02](./worklog/step-02-schema-models.md) |
 | 3 | 認証（Sanctum トークン） | ⬜ 未着手 | register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401 | — |
 | 4 | プロジェクト CRUD + Policy | ⬜ 未着手 | 非メンバーからのアクセスが 404 | — |
 | 5 | メンバー管理 + ロール認可 | ⬜ 未着手 | member ロールが更新/削除で 403、最後の owner を外せない | — |
