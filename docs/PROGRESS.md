@@ -6,10 +6,10 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 
 ## 現在地
 
-- **完了**: Step 0 / 1 / 2 / 3（基本認証・MFA・レート制限・ログインの2段階化。3b と 3c-1 は**実機確認済み**）
-- **次の作業**: **Step 4 — プロジェクト CRUD + Policy**
-- **テスト**: 57 passed / 255 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: `main` と `origin/main` は同期済み。3c-0 は feat `61b6943` / test `114da39` / docs、3c-1 は feat `ff89b4e` / test `910735d` / docs の各3コミット
+- **完了**: Step 0 / 1 / 2 / 3（基本認証・MFA・レート制限・ログインの2段階化。3b と 3c-1 は**実機確認済み**） / 4（プロジェクト CRUD。**実機確認済み**）
+- **次の作業**: **Step 5 — メンバー管理 + ロール認可**
+- **テスト**: 72 passed / 317 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: `main` と `origin/main` は同期済み。3c-1 は feat `ff89b4e` / test `910735d` / docs、Step 4 は feat `cc5377f` / test `8dff014` / docs の各3コミット
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
@@ -26,7 +26,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 3c | └ ログインの2段階化 | ✅ 完了 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化) |
 | 3c-0 | 　└ レート制限 | ✅ 完了 | 全体 60回/分、認証 10回/分、コード検証 5回/分＋30回/日 | [step-03](./worklog/step-03-authentication.md#3c-0-レート制限完了) |
 | 3c-1 | 　└ チャレンジ → 本トークン発行 | ✅ 完了 | TOTP / リカバリコードの検証を通ると本トークンが出る。コードは使い回せない | [step-03](./worklog/step-03-authentication.md#3c-1-引換券と本トークンの発行) |
-| 4 | プロジェクト CRUD + Policy | ⬜ 未着手 | 非メンバーからのアクセスが 404 | — |
+| 4 | プロジェクト CRUD + Policy | ✅ 完了 | 非メンバーからのアクセスが 404 | [step-04](./worklog/step-04-projects.md) |
 | 5 | メンバー管理 + ロール認可 | ⬜ 未着手 | member ロールが更新/削除で 403、最後の owner を外せない | — |
 | 6 | タスク CRUD + scopeBindings | ⬜ 未着手 | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | — |
 | 7 | OpenAPI + TS 型生成 | ⬜ 未着手 | `/docs/api` が開ける、`schema.d.ts` が生成される | — |
@@ -52,6 +52,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 多要素認証 | TOTP（`pragmarx/google2fa`）+ リカバリコード。Step 3 で実装する |
 | レート制限 | 全体 60回/分、パスワード検証 10回/分、コード検証 5回/分＋30回/日。認証済みはユーザー単位、未認証は IP 単位で数える。ログインの2段階目は引換券の持ち主（ユーザー）単位 |
 | ログインの2段階化 | 引換券はランダムな ID ＋ キャッシュの控え（5分・1回きり）。コードの空白は取り除く。TOTP は最後に通ったステップを保存して使い回しを塞ぐ |
+| 認可 | 非メンバーは `{project}` のバインディングを参加プロジェクトに絞って 404。ロールの判定は Policy、呼び出しは `Gate::authorize()` |
 | 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成 |
 | API 設計 | Laravel 公式の道具が主軸（`apiResource` + `scopeBindings` / FormRequest / Policy / API Resource）＋ 複数ステップ処理のみ Action クラス |
 | ボード UI | 3カラム＋ボタンでステータス移動（D&D は完成後の拡張） |
@@ -77,6 +78,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 3b | 実機確認でトークンを付けているのに 401 | Sanctum の平文トークンは `1\|xxxxx` 形式で `\|` を含む。クォート無しで代入して zsh がパイプと解釈していた。`last_used_at` が NULL なのが切り分けの手がかり |
 | 3b | 実機確認で正しいコードなのに 422 | 認証アプリは6桁を3桁ずつ区切って表示する。空白込みで送り `digits:6` で落ちていた（コード検証まで到達していない） |
 | 3c-1 | わざと壊したら関係ないテストまで10件落ちた | 壊し方が広すぎた。`(int)` を付けたせいで「使い回しを許す」ではなく「どんなコードでも通す」になっていた。壊すのは確かめたい性質1つだけにする |
+| 4 | 全件パスしたのに、壊しても落ちない箇所があった | テストの穴。「説明だけを変えられる（name を送らない PATCH）」を書いていなかった |
 
 ## 設計ドキュメント
 

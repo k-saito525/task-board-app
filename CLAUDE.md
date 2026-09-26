@@ -45,15 +45,15 @@ curl -i localhost:8000/api/health                     # DB 接続込みの生存
 |---|---|
 | ルーティング | `Route::apiResource()->scopeBindings()` |
 | バリデーション | `FormRequest` |
-| 認可 | `Policy` + `authorizeResource` |
+| 認可 | `Policy` + `Gate::authorize()`（非メンバーの排除は `{project}` のバインディングで行う） |
 | レスポンス整形 | `JsonResource`（API Resource） |
 | データ取得 | Eloquent のリレーション経由 |
 | 複数ステップの処理 | `app/Actions/` の Action クラス（Fortify / Jetstream と同じ形） |
 
 守ること:
 
-- **クエリでスコープする。** `Project::find($id)` は使わない。`$request->user()->projects()->findOrFail($id)` のようにリレーション経由で辿り、所有権を SQL 側で縛る。取得してから PHP で持ち主を確認する書き方はしない
-- **認可判定は Policy に集約する。** `project_members.role` を読むのは Policy だけ。Controller は `$this->authorize(...)` を呼ぶだけにする
+- **クエリでスコープする。** `Project::find($id)` は使わない。`$request->user()->projects()->findOrFail($id)` のようにリレーション経由で辿り、所有権を SQL 側で縛る。取得してから PHP で持ち主を確認する書き方はしない。URL の `{project}` は `AppServiceProvider::configureRouteBindings()` でこの形に差し替えてあり、非メンバーは 404 になる
+- **認可判定は Policy に集約する。** ロールで可否を決めるのは Policy だけ（Resource が `pivot->role` を表示用に出すのは可）。Controller は `Gate::authorize(...)` を呼ぶだけにする。`authorizeResource` は Laravel 11 以降の空の基底 Controller では動かないので使わない
 - **ネストしたリソースには `scopeBindings()` を付ける。** `/projects/{project}/tasks/{task}` で親子関係が壊れたリクエストを Laravel に 404 させる（IDOR 対策）
 - **起こり得ない入力へのガードは書かない。** 型と契約を信じる
 
