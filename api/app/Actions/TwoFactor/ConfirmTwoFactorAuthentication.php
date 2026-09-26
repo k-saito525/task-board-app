@@ -5,7 +5,6 @@ namespace App\Actions\TwoFactor;
 use App\Models\User;
 use App\Support\RecoveryCode;
 use Illuminate\Validation\ValidationException;
-use PragmaRX\Google2FA\Google2FA;
 
 /**
  * 認証アプリが出したコードを1回検証し、通ったら MFA を有効化する。
@@ -15,7 +14,7 @@ use PragmaRX\Google2FA\Google2FA;
  */
 final class ConfirmTwoFactorAuthentication
 {
-    public function __construct(private readonly Google2FA $google2fa) {}
+    public function __construct(private readonly ConsumeTotpCode $consumeTotpCode) {}
 
     /**
      * @return list<string> 発行したリカバリコード。平文を渡す機会はこの応答だけ
@@ -24,11 +23,9 @@ final class ConfirmTwoFactorAuthentication
      */
     public function __invoke(User $user, string $code): array
     {
-        // verifyKey は現在のステップと前後1ステップ（既定の window = 1、計±30秒）を
-        // 試す。端末の時刻ずれで正しいコードが弾かれるのを防ぐための窓で、広げるほど
-        // 同時に有効なコードが増える。比較は hash_equals なので総当たりの手がかりに
-        // なる時間差は出ない。
-        if (! $this->google2fa->verifyKey($user->two_factor_secret, $code)) {
+        // ログインと同じく使用済みとして記録する。確認に使ったコードを、有効化の直後に
+        // ログインのチャレンジでもう一度通させないため。
+        if (! ($this->consumeTotpCode)($user, $code)) {
             throw ValidationException::withMessages([
                 'code' => __('The provided two factor authentication code was invalid.'),
             ]);

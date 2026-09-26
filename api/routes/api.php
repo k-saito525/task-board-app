@@ -36,6 +36,11 @@ Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
     });
 
+    // ログインの2段階目。まだトークンを持たないので auth:sanctum の外に置く。
+    // 6桁のコードを検証する場所なので confirm と同じ枠で数える。
+    Route::post('two-factor-challenge', [AuthController::class, 'twoFactorChallenge'])
+        ->middleware('throttle:two-factor-code');
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);

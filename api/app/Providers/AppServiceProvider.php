@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\TwoFactorChallenge;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -89,9 +90,34 @@ class AppServiceProvider extends ServiceProvider
         // がキーの重複を検出し、上限値と期間を含むキー（Limit::fallbackKey()）に
         // 差し替える。手で接頭辞を付ける必要はない。
         RateLimiter::for('two-factor-code', fn (Request $request) => [
-            Limit::perMinute(5)->by($this->rateLimitKey($request)),
-            Limit::perDay(30)->by($this->rateLimitKey($request)),
+            Limit::perMinute(5)->by($this->twoFactorCodeKey($request)),
+            Limit::perDay(30)->by($this->twoFactorCodeKey($request)),
         ]);
+    }
+
+    /**
+     * 6桁コードの試行を数える単位。ログインの2段階目はまだトークンが無く未認証だが、
+     * 引換券から持ち主が分かるので、そのユーザーで数える。
+     *
+     * IP で数えると、IP を次々に変えられる相手には IP ごとに30回/日の枠が生まれ、
+     * 日の上限が意味を失う。2段階目に来ている時点で相手はパスワードを知っているので、
+     * 守るべきはユーザーごとの試行回数。confirm（認証済み）と同じキーになるので、
+     * 両方を合わせて1ユーザー30回/日になる。
+     *
+     * 代償として、パスワードを知る相手はわざと間違え続けて本人のコード入力を1日
+     * 止められる。その時点でパスワードは漏れており、変更が必要な状況ではある。
+     *
+     * 券が無効ならユーザーが分からないので IP で数える。無効な券ではコードの検証に
+     * 進めない（CompleteTwoFactorChallenge が先に弾く）。
+     */
+    private function twoFactorCodeKey(Request $request): string
+    {
+        $challenge = $request->input('challenge');
+
+        $userId = $request->user()?->id
+            ?? (is_string($challenge) ? TwoFactorChallenge::userId($challenge) : null);
+
+        return (string) ($userId ?? $request->ip());
     }
 
     /**

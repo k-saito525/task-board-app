@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\TwoFactor\CompleteTwoFactorChallenge;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\TwoFactorChallengeRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\TwoFactorChallenge;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -38,6 +41,33 @@ class AuthController extends Controller
                 'email' => __('auth.failed'),
             ]);
         }
+
+        // MFA が有効なら本トークンはまだ渡さない。引換券を渡し、コードの確認を
+        // twoFactorChallenge で受ける。確認待ち（登録を始めただけ）のユーザーは
+        // hasTwoFactorEnabled() が false なので、従来どおりここでトークンを受け取る。
+        if ($user->hasTwoFactorEnabled()) {
+            return response()->json([
+                'two_factor' => true,
+                'challenge' => TwoFactorChallenge::issue($user),
+            ]);
+        }
+
+        return $this->tokenResponse($user);
+    }
+
+    /**
+     * ログインの2段階目。引換券と認証アプリのコード（またはリカバリコード）を受け取り、
+     * 通ったら本トークンを発行する。
+     */
+    public function twoFactorChallenge(
+        TwoFactorChallengeRequest $request,
+        CompleteTwoFactorChallenge $complete,
+    ): JsonResponse {
+        $user = $complete(
+            $request->validated('challenge'),
+            $request->validated('code'),
+            $request->validated('recovery_code'),
+        );
 
         return $this->tokenResponse($user);
     }

@@ -18,6 +18,7 @@ final class DisableTwoFactorAuthentication
         $user->two_factor_secret = null;
         $user->two_factor_recovery_codes = null;
         $user->two_factor_confirmed_at = null;
+        $user->two_factor_last_used_step = null;
         $user->save();
     }
 }

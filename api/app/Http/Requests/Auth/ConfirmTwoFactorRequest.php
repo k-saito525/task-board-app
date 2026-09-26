@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Http\Requests\Auth\Concerns\NormalizesTotpCode;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ConfirmTwoFactorRequest extends FormRequest
 {
+    use NormalizesTotpCode;
+
     /**
      * @return array<string, mixed>
      */
