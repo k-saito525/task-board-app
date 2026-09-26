@@ -79,18 +79,19 @@ task-board-app/
 
 ## REST API
 
-すべて `/api` 配下。`GET /api/health` 以外は `auth:sanctum`。
+すべて `/api` 配下。`GET /api/health`・register・login・two-factor-challenge 以外は `auth:sanctum`。
 
 ```
 POST   /api/auth/register
-POST   /api/auth/login                             → { token, user }
+POST   /api/auth/login                             → { token, user }。MFA 有効なら { two_factor: true, challenge }
 POST   /api/auth/logout                            → currentAccessToken()->delete()
 GET    /api/auth/me
 
-POST   /api/auth/two-factor                        登録開始。otpauth:// URI とリカバリコードを返す
-POST   /api/auth/two-factor/confirm                コードを検証して有効化
+POST   /api/auth/two-factor                        登録開始。secret と otpauth:// URI を返す
+POST   /api/auth/two-factor/confirm                コードを検証して有効化。リカバリコードを返す
+POST   /api/auth/two-factor/recovery-codes         リカバリコードの再発行
 DELETE /api/auth/two-factor                        解除
-POST   /api/auth/two-factor-challenge              login のチャレンジ + コード → 本トークン
+POST   /api/auth/two-factor-challenge              challenge + code（または recovery_code）→ { token, user }
 
 GET    /api/projects                               自分がメンバーのもののみ
 POST   /api/projects

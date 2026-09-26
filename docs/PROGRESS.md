@@ -6,11 +6,10 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 
 ## 現在地
 
-- **完了**: Step 0 / 1 / 2 / 3a（基本認証） / 3b（MFA の登録・確認・解除、**実機確認済み**） / 3c-0（レート制限）
-- **次の作業**: **Step 3c-1 — ログインの2段階化**。手順は [step-03](./worklog/step-03-authentication.md#3c-1-以降未着手) に記載。チャレンジには `throttle:two-factor-code`（5回/分＋30回/日）をかける
-- **未決**: コードの空白を正規化するか（認証アプリは `751 790` のように区切って表示する）。3c-1 のチャレンジも同じ入力を受けるので揃えて決める。[step-03](./worklog/step-03-authentication.md#未決-コードの空白を正規化するか) に整理済み
-- **テスト**: 39 passed / 188 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: `main` と `origin/main` は同期済み。3b は feat `ac79589` / test `712a79c` / docs、3c-0 は feat `61b6943` / test `114da39` / docs の各3コミット
+- **完了**: Step 0 / 1 / 2 / 3（基本認証・MFA・レート制限・ログインの2段階化。3b と 3c-1 は**実機確認済み**）
+- **次の作業**: **Step 4 — プロジェクト CRUD + Policy**
+- **テスト**: 57 passed / 255 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: `main` と `origin/main` は同期済み。3c-0 は feat `61b6943` / test `114da39` / docs、3c-1 は feat `ff89b4e` / test `910735d` / docs の各3コミット
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
@@ -21,12 +20,12 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 0 | リポジトリの初期整備 | ✅ 完了 | 環境確認、composer 更新、ドキュメント構成と .gitignore | [step-00](./worklog/step-00-setup.md) |
 | 1 | Docker Compose + Postgres + Laravel 雛形 | ✅ 完了 | `docker compose up -d` → `curl localhost:8000/api/health` が 200 | [step-01](./worklog/step-01-docker-laravel.md) |
 | 2 | マイグレーションとモデル | ✅ 完了 | 4テーブル作成、Enum とリレーション定義、Factory | [step-02](./worklog/step-02-schema-models.md) |
-| 3 | 認証（Sanctum トークン） | 🚧 作業中 | 下の 3a / 3b / 3c をすべて満たす | [step-03](./worklog/step-03-authentication.md) |
+| 3 | 認証（Sanctum トークン） | ✅ 完了 | 下の 3a / 3b / 3c をすべて満たす | [step-03](./worklog/step-03-authentication.md) |
 | 3a | └ 基本認証 | ✅ 完了 | register → login → Bearer 付きで `/me` 200、無しで 401、logout 後に 401 | [step-03](./worklog/step-03-authentication.md#3a-基本認証) |
 | 3b | └ MFA の登録・確認・解除 | ✅ 完了 | 認証アプリに登録 → コード確認で有効化 → 解除。シークレットは暗号化して保存 | [step-03](./worklog/step-03-authentication.md#3b-mfa-の登録確認解除) |
-| 3c | └ ログインの2段階化 | 🚧 作業中 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化) |
+| 3c | └ ログインの2段階化 | ✅ 完了 | MFA 有効なユーザーは login でチャレンジを受け取り、コード検証後に本トークンが出る | [step-03](./worklog/step-03-authentication.md#3c-ログインの2段階化) |
 | 3c-0 | 　└ レート制限 | ✅ 完了 | 全体 60回/分、認証 10回/分、コード検証 5回/分＋30回/日 | [step-03](./worklog/step-03-authentication.md#3c-0-レート制限完了) |
-| 3c-1 | 　└ チャレンジ → 本トークン発行 | ⬜ 未着手 | TOTP / リカバリコードの検証を通ると本トークンが出る。コードは使い回せない | [step-03](./worklog/step-03-authentication.md#3c-1-以降未着手) |
+| 3c-1 | 　└ チャレンジ → 本トークン発行 | ✅ 完了 | TOTP / リカバリコードの検証を通ると本トークンが出る。コードは使い回せない | [step-03](./worklog/step-03-authentication.md#3c-1-引換券と本トークンの発行) |
 | 4 | プロジェクト CRUD + Policy | ⬜ 未着手 | 非メンバーからのアクセスが 404 | — |
 | 5 | メンバー管理 + ロール認可 | ⬜ 未着手 | member ロールが更新/削除で 403、最後の owner を外せない | — |
 | 6 | タスク CRUD + scopeBindings | ⬜ 未着手 | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | — |
@@ -51,7 +50,8 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 認証 | Sanctum API トークン（Bearer）＋ Next.js Route Handler を BFF にして httpOnly Cookie 保管 |
 | パスワード | 12文字以上＋漏洩リスト照合（`uncompromised()`）。文字種は強制しない |
 | 多要素認証 | TOTP（`pragmarx/google2fa`）+ リカバリコード。Step 3 で実装する |
-| レート制限 | 全体 60回/分、パスワード検証 10回/分、コード検証 5回/分＋30回/日。認証済みはユーザー単位、未認証は IP 単位で数える |
+| レート制限 | 全体 60回/分、パスワード検証 10回/分、コード検証 5回/分＋30回/日。認証済みはユーザー単位、未認証は IP 単位で数える。ログインの2段階目は引換券の持ち主（ユーザー）単位 |
+| ログインの2段階化 | 引換券はランダムな ID ＋ キャッシュの控え（5分・1回きり）。コードの空白は取り除く。TOTP は最後に通ったステップを保存して使い回しを塞ぐ |
 | 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成 |
 | API 設計 | Laravel 公式の道具が主軸（`apiResource` + `scopeBindings` / FormRequest / Policy / API Resource）＋ 複数ステップ処理のみ Action クラス |
 | ボード UI | 3カラム＋ボタンでステータス移動（D&D は完成後の拡張） |
@@ -76,6 +76,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 3c-0 | 同じく壊しても落ちなかったが、今回はテストの穴ではなかった | 積んだ上限のキー重複は `RateLimiter` が `fallbackKey()` で自動的に分ける。手で付けた接頭辞が無意味だった（削除） |
 | 3b | 実機確認でトークンを付けているのに 401 | Sanctum の平文トークンは `1\|xxxxx` 形式で `\|` を含む。クォート無しで代入して zsh がパイプと解釈していた。`last_used_at` が NULL なのが切り分けの手がかり |
 | 3b | 実機確認で正しいコードなのに 422 | 認証アプリは6桁を3桁ずつ区切って表示する。空白込みで送り `digits:6` で落ちていた（コード検証まで到達していない） |
+| 3c-1 | わざと壊したら関係ないテストまで10件落ちた | 壊し方が広すぎた。`(int)` を付けたせいで「使い回しを許す」ではなく「どんなコードでも通す」になっていた。壊すのは確かめたい性質1つだけにする |
 
 ## 設計ドキュメント
 
