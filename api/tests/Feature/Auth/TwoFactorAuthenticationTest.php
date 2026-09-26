@@ -156,6 +156,20 @@ class TwoFactorAuthenticationTest extends TestCase
     }
 
     /**
+     * 認証アプリは「751 790」のように区切って表示する。日本語入力のまま打つと
+     * 全角空白になるので、そちらでも通ることを確かめる（半角はチャレンジ側で確認）。
+     */
+    public function test_confirming_accepts_a_code_with_spaces(): void
+    {
+        $user = User::factory()->twoFactorPending()->create();
+        $code = $this->currentCode($user);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/auth/two-factor/confirm', ['code' => substr($code, 0, 3)."\u{3000}".substr($code, 3)])
+            ->assertOk();
+    }
+
+    /**
      * 手順を飛ばした呼び出しは 409。入力の誤りではないので 422 とは区別する。
      */
     public function test_confirming_without_starting_the_setup_conflicts(): void

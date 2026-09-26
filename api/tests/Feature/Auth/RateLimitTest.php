@@ -40,6 +40,10 @@ class RateLimitTest extends TestCase
             ->assertHeader('X-RateLimit-Limit', 10);
 
         // コードを検証する場所。重ねた2つの上限のうち厳しい側が出る
+        $this->postJson('/api/auth/two-factor-challenge', ['challenge' => 'unknown', 'code' => '000000'])
+            ->assertUnprocessable()
+            ->assertHeader('X-RateLimit-Limit', 5);
+
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/auth/two-factor/confirm', ['code' => '000000'])
             ->assertUnprocessable()
@@ -133,6 +137,31 @@ class RateLimitTest extends TestCase
         $this->actingAs($other, 'sanctum')
             ->postJson('/api/auth/two-factor/confirm', ['code' => '000000'])
             ->assertUnprocessable();
+    }
+
+    /**
+     * ログインの2段階目は未認証だが、引換券の持ち主で数える。IP で数えると、
+     * IP を次々に変えられる相手には上限が効かない。
+     */
+    public function test_challenge_attempts_are_counted_per_user_across_addresses(): void
+    {
+        $user = User::factory()->twoFactorConfirmed()->create(['password' => Hash::make(self::PASSWORD)]);
+
+        $challenge = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => self::PASSWORD,
+        ])->json('challenge');
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $this->withServerVariables(['REMOTE_ADDR' => "203.0.113.{$attempt}"])
+                ->postJson('/api/auth/two-factor-challenge', ['challenge' => $challenge, 'code' => '000000'])
+                ->assertUnprocessable();
+        }
+
+        // まだ使っていない IP からでも通らない
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.99'])
+            ->postJson('/api/auth/two-factor-challenge', ['challenge' => $challenge, 'code' => '000000'])
+            ->assertTooManyRequests();
     }
 
     /**
