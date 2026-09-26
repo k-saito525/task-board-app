@@ -76,10 +76,14 @@ class User extends Authenticatable
      *     AND projects.id = ?
      *   LIMIT 1
      *   → 非メンバーなら 0 件が返り findOrFail が 404 を投げる
+     *
+     * withPivot('role') で、JOIN した project_members.role も一緒に取る。取得した
+     * プロジェクトの $project->pivot->role が「このユーザーのロール」になる（表示用。
+     * 認可の判定は ProjectPolicy が行う）。
      */
     public function projects(): BelongsToMany
     {
-        return $this->belongsToMany(Project::class, 'project_members');
+        return $this->belongsToMany(Project::class, 'project_members')->withPivot('role');
     }
 
     /**

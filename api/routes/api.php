@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -65,4 +66,15 @@ Route::prefix('auth')->group(function () {
             });
         });
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| プロジェクト
+|--------------------------------------------------------------------------
+| {project} は参加しているプロジェクトの中からだけ探す（AppServiceProvider の
+| configureRouteBindings）。非メンバーには存在しないものとして 404 を返す。
+*/
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('projects', ProjectController::class);
 });

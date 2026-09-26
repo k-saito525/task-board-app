@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\Project;
 use App\Support\TwoFactorChallenge;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -21,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configurePasswordPolicy();
         $this->configureRateLimiting();
+        $this->configureRouteBindings();
 
         // Resource の "data" ラッパーを外す。
         //
@@ -33,6 +36,38 @@ class AppServiceProvider extends ServiceProvider
         // 外すことで、ユーザーオブジェクトはどこに現れても同じ形になる。
         // 一覧のページネーションは別の仕組みなので data / links / meta を返し続ける。
         JsonResource::withoutWrapping();
+    }
+
+    /**
+     * URL の {project} を「自分が参加しているプロジェクトの中から」探すように差し替える。
+     *
+     * 既定のルートモデルバインディングは Project::findOrFail($id)、つまり全員の
+     * プロジェクトから探す。そのまま使うと、取ってきた後に PHP で「メンバーか」を
+     * 確かめる必要があり、1か所でも書き忘れれば他人のプロジェクトが見える。
+     * ここで取得そのものを JOIN で絞れば、メンバーでない限り行が返らず 404 になる。
+     * 書き忘れる場所が無い。
+     *
+     *   SELECT projects.*, project_members.role AS pivot_role, ...
+     *   FROM projects
+     *   INNER JOIN project_members ON projects.id = project_members.project_id
+     *   WHERE project_members.user_id = ?   -- 自分が参加していること
+     *     AND projects.id = ?
+     *   LIMIT 1
+     *
+     * 存在しない id と、存在するが参加していない id は同じ 404 になる。403 を返すと
+     * 「その番号のプロジェクトは存在する」ことが伝わってしまう。
+     *
+     * バインディングは auth ミドルウェアの後に解決される（Kernel::$middlewarePriority で
+     * AuthenticatesRequests が SubstituteBindings より先）ので、ここでユーザーは解決済み。
+     *
+     * id は数字に限る。数字以外を渡すと PostgreSQL が bigint への変換で失敗して 500 に
+     * なるため、ルートに一致させず 404 にする。
+     */
+    private function configureRouteBindings(): void
+    {
+        Route::pattern('project', '[0-9]+');
+
+        Route::bind('project', fn (string $value): Project => request()->user()->projects()->findOrFail($value));
     }
 
     /**
