@@ -71,7 +71,7 @@ task-board-app/
 | `project_members` | id, project_id, user_id, role, timestamps。**UNIQUE(project_id, user_id)** |
 | `tasks` | id, project_id, assignee_id（NULL可）, title, description, status, due_date, timestamps |
 
-- **`projects` に `owner_id` は持たせない。** オーナーは `project_members.role = 'owner'` で表現し、所有権の判定先を1か所に絞る。プロジェクト作成時に作成者を owner として登録する2ステップが `Actions/Project/CreateProject`。「最後の owner は脱退・降格できない」は Policy / FormRequest で守る
+- **`projects` に `owner_id` は持たせない。** オーナーは `project_members.role = 'owner'` で表現し、所有権の判定先を1か所に絞る。プロジェクト作成時に作成者を owner として登録する2ステップが `Actions/Project/CreateProject`。「最後の owner は脱退・降格できない」は Action（`ChangeProjectMemberRole` / `RemoveProjectMember`）がプロジェクトの行をロックしたうえで守る（409）
 - `role` / `status` は文字列カラム + PHP の backed enum（`ProjectRole` = owner/member、`TaskStatus` = todo/in_progress/done）+ モデルの `casts`。DB 側にも CHECK 制約を付けて二重に守る
 - 外部キーは `ON DELETE CASCADE`
 - インデックス: `project_members(project_id, user_id)` UNIQUE、`tasks(project_id, status)`、`tasks(assignee_id)`
@@ -99,10 +99,10 @@ GET    /api/projects/{project}
 PATCH  /api/projects/{project}                     owner のみ
 DELETE /api/projects/{project}                     owner のみ
 
-GET    /api/projects/{project}/members
-POST   /api/projects/{project}/members             owner のみ（email 指定で招待）
-PATCH  /api/projects/{project}/members/{member}    owner のみ
-DELETE /api/projects/{project}/members/{member}    owner のみ
+GET    /api/projects/{project}/members             全員を { data: [...] } で（分割しない）
+POST   /api/projects/{project}/members             owner のみ（登録済みの email を指定。未登録は 422）
+PATCH  /api/projects/{project}/members/{user}      owner のみ。{user} はユーザーの id
+DELETE /api/projects/{project}/members/{user}      owner、または本人（脱退）。最後の owner は 409
 
 GET    /api/projects/{project}/tasks?status=todo
 POST   /api/projects/{project}/tasks
@@ -120,7 +120,7 @@ Laravel 公式が章立てで提供している専用クラスを主軸に据え
 |---|---|
 | ルーティング | `Route::apiResource()->scopeBindings()` |
 | バリデーション | `FormRequest` |
-| 認可 | `Policy` + `Gate::authorize()`（非メンバーの排除は `{project}` のバインディングで行う） |
+| 認可 | `Policy`。本文を受け取るものは `FormRequest::authorize()`、本文の無いものは `Gate::authorize()` で呼ぶ（非メンバーの排除は `{project}` のバインディング） |
 | レスポンス整形 | `JsonResource`（API Resource） |
 | データ取得 | Eloquent のリレーション経由 |
 | 複数ステップの処理 | Action クラス |
@@ -129,7 +129,7 @@ Laravel 公式が章立てで提供している専用クラスを主軸に据え
 
 1. **`scopeBindings()` による親子整合の検証** — `/projects/1/tasks/99` で task 99 が project 1 のものでなければ Laravel が自動で 404 を返す。IDOR 対策をルーティング層で担保する
 2. **所有権はクエリで縛る** — `Project::find($id)` ではなく `$request->user()->projects()->findOrFail($id)`。取得してから PHP で持ち主を判定する実装は、条件の書き漏れがそのまま情報漏洩になるため採らない
-3. **認可判定は Policy に集約** — ロールで可否を決めるのは `ProjectPolicy` / `TaskPolicy` のみ。Controller は `Gate::authorize(...)` を呼ぶだけ。`authorizeResource` は Laravel 11 以降の空の基底 Controller では動かない（内部で旧基底クラスの `middleware()` を使う）ため使わない
+3. **認可判定は Policy に集約** — ロールで可否を決めるのは `ProjectPolicy` / `TaskPolicy` のみ。呼び出しは、本文を受け取るものは `FormRequest::authorize()`（検証より先に走る）、本文の無いものは Controller の `Gate::authorize(...)`。`authorizeResource` は Laravel 11 以降の空の基底 Controller では動かない（内部で旧基底クラスの `middleware()` を使う）ため使わない
 4. **API Resource + `whenLoaded()`** — リレーションが読み込み済みのときだけ出力し N+1 を防ぐ。`paginate()` と組めばページネーションのメタが自動で付く
 5. **トークンの有効期限** — `config/sanctum.php` の `expiration` を設定する。トークンは DB にあるため個別失効が可能
 6. **出力は許可リストで固定する** — API Resource に出すフィールドだけを列挙する。モデルの `#[Hidden]`（拒否リスト）はカラム追加のたびに書き足す必要があるが、Resource は書いていない項目が出ない。`two_factor_secret` のような値を取りこぼさない

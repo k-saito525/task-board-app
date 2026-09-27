@@ -50,6 +50,8 @@ CLAUDE.md には「`authorizeResource` を使う」と書いていたが、**Lar
 
 ユーザーの指定は「最近の主流」。ドキュメントがコントローラの基本形として示しているのが `Gate::authorize()` なので、それにした。CLAUDE.md と DESIGN.md の記述も直した。
 
+> **Step 5 で一部変更。** 本文を受け取るエンドポイント（ここでは update）は `FormRequest::authorize()` に移した。FormRequest の検証はコントローラの本体より先に走るため、コントローラで `Gate::authorize()` を呼ぶと、権限の無い人にも検証の結果（422）が見えてしまう。経緯は [step-05](./step-05-members.md#詰まった点-1-権限の確認が入力の検証より後に走っていた) を参照。
+
 ### 3. 一覧は20件ずつに分ける
 
 `paginate(20)`。応答は `data`（中身）・`links`（前後ページの URL）・`meta`（全件数など）の形になる。3a で `JsonResource::withoutWrapping()` を入れたが、ページネーションは別の仕組みなので `data` のラッパーは残る。
