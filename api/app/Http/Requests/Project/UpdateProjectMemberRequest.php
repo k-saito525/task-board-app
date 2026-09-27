@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\Project;
 
+use App\Enums\ProjectRole;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class UpdateProjectRequest extends FormRequest
+class UpdateProjectMemberRequest extends FormRequest
 {
     /**
      * 権限の確認はここで行う。FormRequest は authorize() → 検証の順に動くので、
@@ -14,20 +16,16 @@ class UpdateProjectRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('update', $this->route('project'));
+        return $this->user()->can('updateMember', $this->route('project'));
     }
 
     /**
-     * PATCH は送られた項目だけを変える。sometimes は「キーがあるときだけ検証する」で、
-     * 送られなかった項目は validated() に入らず、update() でも触られない。
-     *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'role' => ['required', Rule::enum(ProjectRole::class)],
         ];
     }
 }

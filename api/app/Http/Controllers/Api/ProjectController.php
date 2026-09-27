@@ -18,9 +18,13 @@ use Illuminate\Support\Facades\Gate;
  * プロジェクトの CRUD。
  *
  * {project} を受け取るメソッドには、参加しているプロジェクトしか届かない
- * （AppServiceProvider::configureRouteBindings）。ロールで可否が分かれる更新・削除だけ
- * Gate::authorize() で ProjectPolicy を呼ぶ。拒否されると AuthorizationException が
- * 投げられ、Laravel が 403 に変換する。
+ * （AppServiceProvider::configureRouteBindings）。ロールで可否が分かれる更新・削除は
+ * ProjectPolicy で判定する。拒否されると AuthorizationException が投げられ、Laravel が
+ * 403 に変換する。
+ *
+ * Policy を呼ぶ場所は本文の有無で分ける。
+ *   本文あり（update） → FormRequest::authorize()。検証より先に走る
+ *   本文なし（destroy）→ Gate::authorize()
  */
 class ProjectController extends Controller
 {
@@ -69,8 +73,6 @@ class ProjectController extends Controller
 
     public function update(UpdateProjectRequest $request, Project $project): ProjectResource
     {
-        Gate::authorize('update', $project);
-
         $project->update($request->validated());
 
         return new ProjectResource($project);

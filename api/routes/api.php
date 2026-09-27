@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ProjectMemberController;
 use App\Http\Controllers\Api\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -77,4 +78,10 @@ Route::prefix('auth')->group(function () {
 */
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('projects', ProjectController::class);
+
+    // {member} はユーザーの id。scoped() で親のプロジェクトの参加者の中からだけ探す
+    // （project_members.user_id で照合）。1人分を返す show は要らないので作らない。
+    Route::apiResource('projects.members', ProjectMemberController::class)
+        ->except('show')
+        ->scoped(['member' => 'user_id']);
 });

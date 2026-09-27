@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Enums\ProjectRole;
 use App\Models\Project;
+use App\Models\ProjectMember;
 use App\Models\User;
 
 /**
@@ -28,6 +29,32 @@ class ProjectPolicy
     public function delete(User $user, Project $project): bool
     {
         return $this->isOwner($user, $project);
+    }
+
+    /*
+    | メンバー管理。Jetstream の TeamPolicy（addTeamMember / updateTeamMember /
+    | removeTeamMember）と同じく、親のプロジェクトの Policy に置く。判定は親の
+    | ロールで決まり、ProjectMember 単体では決まらないため。
+    */
+
+    public function addMember(User $user, Project $project): bool
+    {
+        return $this->isOwner($user, $project);
+    }
+
+    public function updateMember(User $user, Project $project): bool
+    {
+        return $this->isOwner($user, $project);
+    }
+
+    /**
+     * owner は誰でも外せる。owner でなくても自分自身なら外せる（プロジェクトから抜ける）。
+     * 最後の owner を外せないことは RemoveProjectMember が守る（ロールではなく人数の
+     * 問題で、同時に届いたリクエストと合わせて数える必要があるため）。
+     */
+    public function removeMember(User $user, Project $project, ProjectMember $member): bool
+    {
+        return $member->user_id === $user->id || $this->isOwner($user, $project);
     }
 
     /**
