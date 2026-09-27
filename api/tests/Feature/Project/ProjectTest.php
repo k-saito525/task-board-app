@@ -195,6 +195,14 @@ class ProjectTest extends TestCase
         $this->assertSame('Original name', $this->project->fresh()->name);
     }
 
+    /** 権限の確認は入力の検証より先。権限の無い人に検証の結果（422）を見せない */
+    public function test_members_get_403_before_their_input_is_validated(): void
+    {
+        $this->actingAs($this->member, 'sanctum')
+            ->patchJson($this->url(), ['name' => ''])
+            ->assertForbidden();
+    }
+
     public function test_outsiders_cannot_update_the_project(): void
     {
         $this->actingAs($this->outsider, 'sanctum')
