@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectMemberController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -84,4 +85,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('projects.members', ProjectMemberController::class)
         ->except('show')
         ->scoped(['member' => 'user_id']);
+
+    // {task} はそのプロジェクトのタスクの中からだけ探す。scoped() に何も渡さないと、
+    // すべての引数が「既定の列（id）で、親のリレーション経由で探す」になる。
+    // リソースルートに scopeBindings() は無く、これが同じ働きをする。
+    Route::apiResource('projects.tasks', TaskController::class)->scoped();
 });

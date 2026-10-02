@@ -14,8 +14,10 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  *
  * 人数の確認はプロジェクトの行をロックしてから行う（AddProjectMember / ChangeProjectMemberRole を参照）。
  *
- * 外れた人が担当していたタスクは、tasks.assignee_id がそのまま残る。Step 6 で
- * 担当者をメンバーに限るときに扱いを決める。
+ * 外れた人が担当していたタスクは、担当を外して未割り当てに戻す（Trello も、ボードから
+ * 外した人を全カードの担当から外す）。担当者は必ずそのプロジェクトのメンバー、という
+ * 決まり（タスクの作成・更新で検証している）を、外した後も崩さない。同じトランザクション
+ * の中で行うので、「外れたのに担当のまま」の状態が途中で見えることもない。
  */
 final class RemoveProjectMember
 {
@@ -34,6 +36,12 @@ final class RemoveProjectMember
                 Response::HTTP_CONFLICT,
                 __('The last owner cannot leave the project.'),
             );
+
+            //   UPDATE tasks SET assignee_id = NULL, updated_at = ?
+            //   WHERE project_id = ? AND assignee_id = ?
+            $member->project->tasks()
+                ->where('assignee_id', $member->user_id)
+                ->update(['assignee_id' => null]);
 
             $member->delete();
         });

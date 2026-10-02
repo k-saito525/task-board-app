@@ -67,6 +67,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Route::pattern('project', '[0-9]+');
         Route::pattern('member', '[0-9]+');
+        Route::pattern('task', '[0-9]+');
 
         Route::bind('project', fn (string $value): Project => request()->user()->projects()->findOrFail($value));
     }

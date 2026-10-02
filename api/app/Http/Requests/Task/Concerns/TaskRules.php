@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Http\Requests\Task\Concerns;
+
+use App\Enums\TaskStatus;
+use App\Models\Project;
+use Illuminate\Validation\Rule;
+
+/**
+ * 作成と更新で共通の項目ルール。更新側は各項目の先頭に sometimes を足して使う。
+ */
+trait TaskRules
+{
+    /**
+     * @return array<string, list<mixed>>
+     */
+    protected function taskRules(): array
+    {
+        /** @var Project $project */
+        $project = $this->route('project');
+
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'status' => [Rule::enum(TaskStatus::class)],
+            'due_date' => ['nullable', 'date_format:Y-m-d'],
+            // 担当者はこのプロジェクトのメンバーに限る。users に存在するだけでは足りない。
+            // 部外者を担当にできると、そのカードに部外者の名前が出続ける。
+            //
+            //   SELECT count(*) FROM project_members WHERE user_id = ? AND project_id = ?
+            'assignee_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('project_members', 'user_id')->where('project_id', $project->id),
+            ],
+        ];
+    }
+}

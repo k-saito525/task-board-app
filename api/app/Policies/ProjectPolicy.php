@@ -57,6 +57,20 @@ class ProjectPolicy
         return $member->user_id === $user->id || $this->isOwner($user, $project);
     }
 
+    /*
+    | タスク。作成・編集・ステータスの移動はメンバー全員ができる（{project} のバインディングが
+    | メンバーであることを保証するので、ここにはメソッドを置かない）。
+    |
+    | 削除だけは owner に限る。物理削除で取り消せないため。不要になったタスクは member でも
+    | done にできる。GitHub の Issue も、閉じるのは書き込み権限で足りるが、削除は管理者に
+    | 限っている。可否が親のプロジェクトのロールで決まるので、メンバー管理と同じくここに置く。
+    */
+
+    public function deleteTask(User $user, Project $project): bool
+    {
+        return $this->isOwner($user, $project);
+    }
+
     /**
      * ロールは毎回 DB に問い合わせる。バインディングで取れた pivot の値を使えば1回
      * 減らせるが、それだとプロジェクトをどう取得したかに判定が左右される。
