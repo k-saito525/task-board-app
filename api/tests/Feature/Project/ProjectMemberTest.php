@@ -4,6 +4,7 @@ namespace Tests\Feature\Project;
 
 use App\Enums\ProjectRole;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -248,6 +249,26 @@ class ProjectMemberTest extends TestCase
         $this->actingAs($this->member, 'sanctum')
             ->getJson("/api/projects/{$this->project->id}")
             ->assertNotFound();
+    }
+
+    /**
+     * 外した人の担当は外す。「担当者は必ずメンバー」を崩さない。
+     * 同じ人が担当している、別のプロジェクトのタスクには触れない。
+     */
+    public function test_removing_a_member_unassigns_their_tasks_in_this_project_only(): void
+    {
+        $assigned = Task::factory()->for($this->project)->assignedTo($this->member)->create();
+        $elsewhere = Task::factory()
+            ->for(Project::factory()->ownedBy($this->member))
+            ->assignedTo($this->member)
+            ->create();
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->deleteJson($this->url($this->member))
+            ->assertNoContent();
+
+        $this->assertNull($assigned->fresh()->assignee_id);
+        $this->assertSame($this->member->id, $elsewhere->fresh()->assignee_id);
     }
 
     public function test_members_cannot_remove_other_members(): void
