@@ -21,8 +21,11 @@ web/   Next.js 16 (App Router, TS, Tailwind)
 docker compose up -d                                  # db + api を起動
 docker compose exec api php artisan migrate
 docker compose exec api php artisan test
+docker compose exec api composer openapi              # OpenAPI を api/openapi.json に書き出す
 docker compose exec db psql -U app -d taskboard
 ```
+
+**API の入出力（ルート・FormRequest・Resource）を変えたら `composer openapi` を実行し、`api/openapi.json` も一緒にコミットする。** フロントの型はこのファイルから作る。ドキュメントは `http://localhost:8000/docs/api`（`APP_ENV=local` のときだけ開ける）。
 
 **HTTP リクエストはユーザーが実行する。** `curl` / `wget` は `.claude/settings.json` で deny されており、Claude は HTTP リクエストを発行しない。API の動作確認が必要なときは、実行してほしいコマンドを提示して結果を教えてもらう。
 

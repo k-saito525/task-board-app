@@ -7,9 +7,9 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 ## 現在地
 
 - **完了**: Step 0 / 1 / 2 / 3（基本認証・MFA・レート制限・ログインの2段階化。3b と 3c-1 は**実機確認済み**） / 4（プロジェクト CRUD。**実機確認済み**）
-- **次の作業**: **Step 5・6 の実機確認**（curl）。Step 5 の手順はチャットで提示済み、Step 6 の手順はこれから提示。並行して Step 7（OpenAPI + TS 型生成）に進める
-- **テスト**: 113 passed / 485 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: `main` と `origin/main` は同期済み。Step 5 は feat `20d7995` / test `13cc45f` / docs、Step 6 は feat `270bf85` / test `17ad125` / docs の各3コミット（どちらも実機確認の前にコミット）
+- **次の作業**: **Step 5・6 の実機確認**（curl）と **Step 7 のブラウザ確認**（`http://localhost:8000/docs/api`）。済んだら Step 8（Next.js 雛形 + BFF 認証）へ
+- **テスト**: 118 passed / 514 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: `main` と `origin/main` は同期済み。Step 6 は feat `270bf85` / test `17ad125` / docs、Step 7 は chore(deps) `0c33e9f` → feat `f397c05` / test `1989848` / docs（Step 5〜7 は確認の前にコミット）
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
@@ -29,8 +29,8 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 4 | プロジェクト CRUD + Policy | ✅ 完了 | 非メンバーからのアクセスが 404 | [step-04](./worklog/step-04-projects.md) |
 | 5 | メンバー管理 + ロール認可 | 🚧 実機確認待ち | member ロールが更新/削除で 403、最後の owner を外せない | [step-05](./worklog/step-05-members.md) |
 | 6 | タスク CRUD + scoped | 🚧 実機確認待ち | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | [step-06](./worklog/step-06-tasks.md) |
-| 7 | OpenAPI + TS 型生成 | ⬜ 未着手 | `/docs/api` が開ける、`schema.d.ts` が生成される | — |
-| 8 | Next.js 雛形 + BFF 認証 | ⬜ 未着手 | ブラウザで register → login、リロードで維持、JS からトークンが見えない | — |
+| 7 | OpenAPI + TS 型生成 | 🚧 ブラウザ確認待ち | `/docs/api` が開ける、`api/openapi.json` を書き出してコミット、そこから TS 型が生成できる（`web/` への配置は Step 8） | [step-07](./worklog/step-07-openapi.md) |
+| 8 | Next.js 雛形 + BFF 認証 | ⬜ 未着手 | ブラウザで register → login、リロードで維持、JS からトークンが見えない、`npm run gen:api` で `schema.d.ts` が生成される | — |
 | 9 | プロジェクト一覧・作成 UI | ⬜ 未着手 | ブラウザでプロジェクト CRUD が一通り動く | — |
 | 10 | ボード UI（3カラム） | ⬜ 未着手 | タスク作成 → ボタンでステータス移動 → 削除が動く | — |
 | 11 | メンバー管理 UI | ⬜ 未着手 | 招待した別ユーザーでログインするとボードが見える | — |
@@ -55,7 +55,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 認可 | 非メンバーは `{project}` のバインディングを参加プロジェクトに絞って 404。ロールの判定は Policy。呼び出しは本文ありなら `FormRequest::authorize()`（検証より先）、本文なしなら `Gate::authorize()` |
 | タスク | 作成・編集・移動はメンバー全員、削除は owner。担当者はメンバーに限り、メンバーを外すと担当も外す。一覧は全件、ステータスの移動は通常の PATCH |
 | 仕様の判断 | Step 6 以降は Claude に一任。最新の実務の主流・本プロジェクトへの適合・標準的なセキュリティで決め、根拠と見送った案を worklog に残す |
-| 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成 |
+| 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成。OpenAPI は `composer openapi` で `api/openapi.json` に書き出してコミット。PATCH 優先・サーバー URL は相対・DELETE の項目は本文 |
 | API 設計 | Laravel 公式の道具が主軸（`apiResource` + `scopeBindings` / FormRequest / Policy / API Resource）＋ 複数ステップ処理のみ Action クラス |
 | ボード UI | 3カラム＋ボタンでステータス移動（D&D は完成後の拡張） |
 | テスト | PHPUnit（Feature 中心） |
@@ -83,6 +83,8 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 4 | 全件パスしたのに、壊しても落ちない箇所があった | テストの穴。「説明だけを変えられる（name を送らない PATCH）」を書いていなかった |
 | 5 | owner でない人が、招待の 422 と 403 の違いでメールアドレスの登録状況を調べられた | FormRequest の検証はコントローラ本体より先に走る。`Gate::authorize()` をコントローラに書くと検証の後になる。`FormRequest::authorize()` へ移した |
 | 5 | ページ分けしない一覧だけ `data` で包まれない | `withoutWrapping()` の影響（3a と同じ仕組み）。手で `data` に包み、「一覧は常に data の中」を決まりにした |
+| 7 | Scramble がタスクの FormRequest を読めない（警告） | Scramble はリクエストの外で `rules()` を呼ぶので `$this->route('project')` が null。条件をクロージャに包んで検証時に読む |
+| 7 | MFA 解除のパスワードが OpenAPI でクエリになっていた | Scramble は DELETE の項目を常にクエリとして書く。そのまま型を作るとパスワードが URL に乗る。ドキュメント変換で本文に移し、テストで固定 |
 
 ## 設計ドキュメント
 

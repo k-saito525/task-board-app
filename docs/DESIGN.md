@@ -149,7 +149,7 @@ App Router の Server Components を主軸にデータを取得し、変更は S
 
 トークンが `document.cookie` からも `localStorage` からも読めないため、XSS が起きてもトークンを持ち出せない。
 
-型は `npm run gen:api` で `web/src/lib/api/schema.d.ts` を再生成する。生成物はコミットし、API の変更がフロントの型にどう波及したかを差分でレビューできるようにする。fetch は `openapi-fetch` で型を効かせる。
+OpenAPI は `composer openapi`（`php artisan scramble:export`）で `api/openapi.json` に書き出してコミットする。型は `npm run gen:api` でそこから `web/src/lib/api/schema.d.ts` を再生成する（`web/` は Step 8 で作るので、配置はそこで行う）。生成物はコミットし、API の変更がフロントの型にどう波及したかを差分でレビューできるようにする。fetch は `openapi-fetch` で型を効かせる。
 
 ## CI
 
