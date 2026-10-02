@@ -5,9 +5,8 @@ namespace App\Actions\Project;
 use App\Enums\ProjectRole;
 use App\Models\Project;
 use App\Models\ProjectMember;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * メンバーのロールを変える。最後の owner を member に下げることはできない。
@@ -20,7 +19,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 final class ChangeProjectMemberRole
 {
     /**
-     * @throws HttpException 409 最後の owner を下げようとしたとき
+     * @throws ConflictHttpException 最後の owner を下げようとしたとき（409）
      */
     public function __invoke(ProjectMember $member, ProjectRole $role): ProjectMember
     {
@@ -30,11 +29,9 @@ final class ChangeProjectMemberRole
             // ロックを待つ間に、別のリクエストがこの人のロールを変えたかもしれない
             $member->refresh();
 
-            abort_if(
-                $role !== ProjectRole::Owner && $member->isLastOwner(),
-                Response::HTTP_CONFLICT,
-                __('The last owner cannot be demoted.'),
-            );
+            if ($role !== ProjectRole::Owner && $member->isLastOwner()) {
+                throw new ConflictHttpException(__('The last owner cannot be demoted.'));
+            }
 
             $member->update(['role' => $role]);
 

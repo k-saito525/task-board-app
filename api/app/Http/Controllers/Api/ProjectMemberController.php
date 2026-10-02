@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * プロジェクトのメンバー管理。
@@ -65,6 +66,9 @@ class ProjectMemberController extends Controller
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
+    /**
+     * @throws ConflictHttpException 最後の owner を member に下げようとしたとき（409）
+     */
     public function update(
         UpdateProjectMemberRequest $request,
         Project $project,
@@ -76,6 +80,8 @@ class ProjectMemberController extends Controller
 
     /**
      * owner が外す場合と、本人が抜ける場合の両方をここで受ける。
+     *
+     * @throws ConflictHttpException 最後の owner を外そうとしたとき（409）
      */
     public function destroy(Project $project, ProjectMember $member, RemoveProjectMember $remove): Response
     {

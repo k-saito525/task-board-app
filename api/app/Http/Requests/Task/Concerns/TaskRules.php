@@ -4,6 +4,7 @@ namespace App\Http\Requests\Task\Concerns;
 
 use App\Enums\TaskStatus;
 use App\Models\Project;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Validation\Rule;
 
 /**
@@ -16,9 +17,6 @@ trait TaskRules
      */
     protected function taskRules(): array
     {
-        /** @var Project $project */
-        $project = $this->route('project');
-
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -28,11 +26,22 @@ trait TaskRules
             // 部外者を担当にできると、そのカードに部外者の名前が出続ける。
             //
             //   SELECT count(*) FROM project_members WHERE user_id = ? AND project_id = ?
+            //
+            // プロジェクトの条件はクロージャに包み、検証の時点で初めて読む。Scramble は
+            // OpenAPI を作るときにリクエストの外で rules() を呼ぶので、ここで
+            // $this->route('project') を直接読むと（ルートが無く null）失敗する。
             'assignee_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('project_members', 'user_id')->where('project_id', $project->id),
+                Rule::exists('project_members', 'user_id')->where(
+                    fn (Builder $query) => $query->where('project_id', $this->project()->id),
+                ),
             ],
         ];
+    }
+
+    private function project(): Project
+    {
+        return $this->route('project');
     }
 }

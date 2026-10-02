@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Models\Project;
+use App\Support\OpenApi\DeleteParametersAsBody;
 use App\Support\TwoFactorChallenge;
+use Dedoc\Scramble\Scramble;
+use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\Server;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -24,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configurePasswordPolicy();
         $this->configureRateLimiting();
         $this->configureRouteBindings();
+        $this->configureApiDocs();
 
         // Resource の "data" ラッパーを外す。
         //
@@ -70,6 +75,30 @@ class AppServiceProvider extends ServiceProvider
         Route::pattern('task', '[0-9]+');
 
         Route::bind('project', fn (string $value): Project => request()->user()->projects()->findOrFail($value));
+    }
+
+    /**
+     * OpenAPI（Scramble）の書き出し方。生成された OpenAPI はリポジトリにコミットし、
+     * フロントの型（openapi-typescript）の元にする。CI では書き出し直してコミット済みの
+     * ものと比べ、API とフロントの型のずれを検出する（Step 13）。
+     *
+     * - PUT|PATCH のルートは PATCH として書く。apiResource の update は両方を受けるが、
+     *   実装は「送った項目だけを変える」で、意味は PATCH
+     * - サーバー URL は相対パスの /api にする。既定では url() で APP_URL から作られ、
+     *   開発環境と CI で APP_URL が違うと、同じコードでも書き出し結果が変わってしまう
+     * - DELETE の項目は本文として書く（DeleteParametersAsBody）。既定ではクエリになり、
+     *   MFA 解除のパスワードが URL に乗る型が作られてしまう
+     */
+    private function configureApiDocs(): void
+    {
+        Scramble::configure()
+            ->preferPatchMethod()
+            ->withDocumentTransformers([
+                function (OpenApi $openApi): void {
+                    $openApi->servers = [Server::make('/api')];
+                },
+                DeleteParametersAsBody::class,
+            ]);
     }
 
     /**

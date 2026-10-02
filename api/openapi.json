@@ -1,0 +1,1859 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Task Board API",
+        "version": "0.0.1",
+        "description": "\u30c1\u30fc\u30e0\u5171\u6709\u30bf\u30b9\u30af\u30dc\u30fc\u30c9\u306e API\u3002\u8a8d\u8a3c\u306f Sanctum \u306e API \u30c8\u30fc\u30af\u30f3\uff08`Authorization: Bearer <token>`\uff09\u3002"
+    },
+    "servers": [
+        {
+            "url": "/api"
+        }
+    ],
+    "security": [
+        {
+            "http": []
+        }
+    ],
+    "paths": {
+        "/health": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "const": "ok"
+                                        },
+                                        "database": {
+                                            "type": "string",
+                                            "const": "up"
+                                        }
+                                    },
+                                    "required": [
+                                        "status",
+                                        "database"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "const": "error"
+                                        },
+                                        "database": {
+                                            "type": "string",
+                                            "const": "down"
+                                        }
+                                    },
+                                    "required": [
+                                        "status",
+                                        "database"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "operationId": "auth.register",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {
+                                            "type": "string",
+                                            "description": "plainTextToken \u306f\u767a\u884c\u76f4\u5f8c\u306e\u3053\u306e\u4e00\u5ea6\u3057\u304b\u53d6\u5f97\u3067\u304d\u306a\u3044\u3002\nDB \u306b\u306f SHA-256 \u30cf\u30c3\u30b7\u30e5\u304c\u4fdd\u5b58\u3055\u308c\u3001\u5e73\u6587\u306f\u6b8b\u3089\u306a\u3044\u3002"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/UserResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "token",
+                                        "user"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "operationId": "auth.login",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "token": {
+                                                    "type": "string",
+                                                    "description": "plainTextToken \u306f\u767a\u884c\u76f4\u5f8c\u306e\u3053\u306e\u4e00\u5ea6\u3057\u304b\u53d6\u5f97\u3067\u304d\u306a\u3044\u3002\nDB \u306b\u306f SHA-256 \u30cf\u30c3\u30b7\u30e5\u304c\u4fdd\u5b58\u3055\u308c\u3001\u5e73\u6587\u306f\u6b8b\u3089\u306a\u3044\u3002"
+                                                },
+                                                "user": {
+                                                    "$ref": "#/components/schemas/UserResource"
+                                                }
+                                            },
+                                            "required": [
+                                                "token",
+                                                "user"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "two_factor": {
+                                                    "type": "boolean"
+                                                },
+                                                "challenge": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "two_factor",
+                                                "challenge"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/two-factor-challenge": {
+            "post": {
+                "operationId": "auth.twoFactorChallenge",
+                "summary": "\u30ed\u30b0\u30a4\u30f3\u306e2\u6bb5\u968e\u76ee\u3002\u5f15\u63db\u5238\u3068\u8a8d\u8a3c\u30a2\u30d7\u30ea\u306e\u30b3\u30fc\u30c9\uff08\u307e\u305f\u306f\u30ea\u30ab\u30d0\u30ea\u30b3\u30fc\u30c9\uff09\u3092\u53d7\u3051\u53d6\u308a\u3001\n\u901a\u3063\u305f\u3089\u672c\u30c8\u30fc\u30af\u30f3\u3092\u767a\u884c\u3059\u308b\u3002",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFactorChallengeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {
+                                            "type": "string",
+                                            "description": "plainTextToken \u306f\u767a\u884c\u76f4\u5f8c\u306e\u3053\u306e\u4e00\u5ea6\u3057\u304b\u53d6\u5f97\u3067\u304d\u306a\u3044\u3002\nDB \u306b\u306f SHA-256 \u30cf\u30c3\u30b7\u30e5\u304c\u4fdd\u5b58\u3055\u308c\u3001\u5e73\u6587\u306f\u6b8b\u3089\u306a\u3044\u3002"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/UserResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "token",
+                                        "user"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "operationId": "auth.me",
+                "tags": [
+                    "Auth"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`UserResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserResource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "operationId": "auth.logout",
+                "tags": [
+                    "Auth"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/projects": {
+            "get": {
+                "operationId": "projects.index",
+                "description": "SELECT projects.*, project_members.role AS pivot_role, ...\n  FROM projects\n  INNER JOIN project_members ON projects.id = project_members.project_id\n  WHERE project_members.user_id = ?\n  ORDER BY projects.id DESC\n  LIMIT 20 OFFSET ?\n\n\u4e26\u3073\u9806\u3092 id \u306b\u3057\u3066\u3044\u308b\u306e\u306f\u3001\u30da\u30fc\u30b8\u306e\u5883\u76ee\u3067\u884c\u304c\u91cd\u8907\u30fb\u6b20\u843d\u3057\u306a\u3044\u305f\u3081\u3002created_at \u306f\n\u540c\u3058\u6642\u523b\u306e\u884c\u304c\u3042\u308a\u5f97\u308b\u306e\u3067\u3001\u305d\u308c\u3060\u3051\u3067\u306f\u9806\u5e8f\u304c\u4e00\u610f\u306b\u6c7a\u307e\u3089\u306a\u3044\u3002",
+                "summary": "\u81ea\u5206\u304c\u53c2\u52a0\u3057\u3066\u3044\u308b\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u4e00\u89a7\u3002\u65b0\u3057\u3044\u9806\u306b20\u4ef6\u305a\u3064\u3002",
+                "tags": [
+                    "Project"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ProjectResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ProjectResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "projects.store",
+                "summary": "\u4f5c\u6210\u8005\u306f owner \u3068\u3057\u3066\u53c2\u52a0\u3059\u308b\u3002",
+                "tags": [
+                    "Project"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreProjectRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ProjectResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProjectResource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/projects/{project}": {
+            "get": {
+                "operationId": "projects.show",
+                "tags": [
+                    "Project"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`ProjectResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProjectResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "projects.update",
+                "tags": [
+                    "Project"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateProjectRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ProjectResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProjectResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "projects.destroy",
+                "summary": "\u30e1\u30f3\u30d0\u30fc\u3068\u30bf\u30b9\u30af\u306f\u5916\u90e8\u30ad\u30fc\u306e ON DELETE CASCADE \u3067\u4e00\u7dd2\u306b\u6d88\u3048\u308b\u3002",
+                "tags": [
+                    "Project"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/projects/{project}/members": {
+            "get": {
+                "operationId": "projects.members.index",
+                "description": "SELECT * FROM project_members WHERE project_id = ? ORDER BY id\n  SELECT * FROM users WHERE id IN (?, ?, ...)   \u2190 with('user')\u30021\u4eba\u305a\u3064\u5f15\u304b\u306a\u3044\n\ndata \u3067\u5305\u3080\u306e\u306f\u624b\u3067\u884c\u3046\u3002JsonResource::withoutWrapping()\uff08AppServiceProvider\uff09\u3067\n\u30e9\u30c3\u30d1\u30fc\u3092\u5916\u3057\u3066\u3044\u308b\u305f\u3081\u3001\u30da\u30fc\u30b8\u5206\u3051\u3057\u306a\u3044\u30b3\u30ec\u30af\u30b7\u30e7\u30f3\u306f\u6700\u4e0a\u4f4d\u304c\u88f8\u306e\u914d\u5217\u306b\u306a\u308b\u3002\n\u30da\u30fc\u30b8\u5206\u3051\u3057\u305f\u4e00\u89a7\uff08\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u4e00\u89a7\uff09\u306f\u5225\u306e\u4ed5\u7d44\u307f\u3067 data / links / meta \u3092\u8fd4\u3059\u306e\u3067\u3001\n\u300c\u4e00\u89a7\u306f\u5e38\u306b data \u306e\u4e2d\u300d\u306b\u63c3\u3048\u308b\u3002",
+                "summary": "\u53c2\u52a0\u8005\u306e\u5168\u54e1\u3002\u4eba\u6570\u306f\u9650\u3089\u308c\u3066\u304a\u308a\u3001\u62c5\u5f53\u8005\u306e\u9078\u629e\uff08Step 10\uff09\u3067\u3082\u5168\u54e1\u304c\u8981\u308b\u306e\u3067\n\u5206\u5272\u3057\u306a\u3044\u3002\u53c2\u52a0\u3057\u305f\u9806\u306b\u4e26\u3079\u308b\u3002",
+                "tags": [
+                    "ProjectMember"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ProjectMemberResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "projects.members.store",
+                "tags": [
+                    "ProjectMember"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddProjectMemberRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`ProjectMemberResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProjectMemberResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/projects/{project}/members/{member}": {
+            "patch": {
+                "operationId": "projects.members.update",
+                "tags": [
+                    "ProjectMember"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "member",
+                        "in": "path",
+                        "required": true,
+                        "description": "The member user id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateProjectMemberRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`ProjectMemberResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProjectMemberResource"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "projects.members.destroy",
+                "summary": "owner \u304c\u5916\u3059\u5834\u5408\u3068\u3001\u672c\u4eba\u304c\u629c\u3051\u308b\u5834\u5408\u306e\u4e21\u65b9\u3092\u3053\u3053\u3067\u53d7\u3051\u308b\u3002",
+                "tags": [
+                    "ProjectMember"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "member",
+                        "in": "path",
+                        "required": true,
+                        "description": "The member user id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/projects/{project}/tasks": {
+            "get": {
+                "operationId": "projects.tasks.index",
+                "description": "SELECT * FROM tasks WHERE project_id = ? [AND status = ?] ORDER BY id\n  \u2192 index(project_id, status) \u304c\u305d\u306e\u307e\u307e\u52b9\u304f\n  SELECT * FROM users WHERE id IN (?, ...)   \u2190 with('assignee')\u30021\u4ef6\u305a\u3064\u5f15\u304b\u306a\u3044",
+                "summary": "\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u30bf\u30b9\u30af\u3092\u5168\u4ef6\u3002\u30dc\u30fc\u30c9\u306f3\u5217\u3059\u3079\u3066\u306e\u30ab\u30fc\u30c9\u3092\u4e00\u5ea6\u306b\u63cf\u304f\u306e\u3067\u5206\u5272\u3057\u306a\u3044\n\uff08Trello \u3082\u30dc\u30fc\u30c9\u3092\u958b\u304f\u3068\u5168\u30ab\u30fc\u30c9\u3092\u8aad\u307f\u8fbc\u3080\uff09\u3002?status= \u30671\u5217\u5206\u306b\u7d5e\u308c\u308b\u3002",
+                "tags": [
+                    "Task"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/TaskStatus"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/TaskResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "projects.tasks.store",
+                "summary": "project_id \u306f fillable \u306b\u542b\u3081\u305a\u3001\u30ea\u30ec\u30fc\u30b7\u30e7\u30f3\u7d4c\u7531\u306e create() \u3067\u89aa\u304b\u3089\u5165\u308c\u308b\u3002\n\u30ea\u30af\u30a8\u30b9\u30c8\u306e\u5024\u3067\u30bf\u30b9\u30af\u306e\u6240\u5c5e\u5148\u3092\u5909\u3048\u3089\u308c\u308b\u4f59\u5730\u3092\u4f5c\u3089\u306a\u3044\u3002",
+                "tags": [
+                    "Task"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreTaskRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "`TaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/projects/{project}/tasks/{task}": {
+            "get": {
+                "operationId": "projects.tasks.show",
+                "tags": [
+                    "Task"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "task",
+                        "in": "path",
+                        "required": true,
+                        "description": "The task ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "`TaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "projects.tasks.update",
+                "tags": [
+                    "Task"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "task",
+                        "in": "path",
+                        "required": true,
+                        "description": "The task ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateTaskRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "`TaskResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskResource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "projects.tasks.destroy",
+                "tags": [
+                    "Task"
+                ],
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "path",
+                        "required": true,
+                        "description": "The project ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "task",
+                        "in": "path",
+                        "required": true,
+                        "description": "The task ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/auth/two-factor/confirm": {
+            "post": {
+                "operationId": "twoFactorAuthentication.confirm",
+                "summary": "\u8a8d\u8a3c\u30a2\u30d7\u30ea\u306e\u30b3\u30fc\u30c9\u3092\u78ba\u8a8d\u3057\u3066\u6709\u52b9\u5316\u3059\u308b\u3002\u30ea\u30ab\u30d0\u30ea\u30b3\u30fc\u30c9\u306f\u3053\u3053\u3067\u521d\u3081\u3066\u767a\u884c\u3059\u308b\u3002",
+                "tags": [
+                    "TwoFactorAuthentication"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmTwoFactorRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "recovery_codes": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "recovery_codes"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "Two factor authentication has not been started."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/auth/two-factor": {
+            "post": {
+                "operationId": "twoFactorAuthentication.store",
+                "summary": "\u767b\u9332\u3092\u958b\u59cb\u3059\u308b\u3002\u30b7\u30fc\u30af\u30ec\u30c3\u30c8\u3092\u767a\u884c\u3059\u308b\u304c\u3001\u3053\u306e\u6642\u70b9\u3067\u306f MFA \u306f\u307e\u3060\u7121\u52b9\u3002",
+                "tags": [
+                    "TwoFactorAuthentication"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordConfirmationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "secret": {
+                                            "type": "string",
+                                            "description": "QR \u753b\u50cf\u306f\u4f5c\u3089\u305a otpauth: \u306e URI \u3060\u3051\u3092\u8fd4\u3059\u3002\u753b\u50cf\u5316\u306f\u30d5\u30ed\u30f3\u30c8\u306e\u8cac\u52d9\n\uff08\u8868\u793a\u306e\u90fd\u5408\u3067\u89e3\u50cf\u5ea6\u3084\u914d\u8272\u304c\u5909\u308f\u308b\u4e00\u65b9\u3001URI \u306f\u5909\u308f\u3089\u306a\u3044\uff09\u3002\n\u624b\u5165\u529b\u3057\u305f\u3044\u30e6\u30fc\u30b6\u30fc\u5411\u3051\u306b secret \u3082\u8fd4\u3059\u3002\u3069\u3061\u3089\u3082\u540c\u3058\u9375\u3092\u904b\u3076\u3002"
+                                        },
+                                        "otpauth_uri": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "secret",
+                                        "otpauth_uri"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "Two factor authentication is already enabled."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "twoFactorAuthentication.destroy",
+                "summary": "MFA \u3092\u89e3\u9664\u3059\u308b\u3002\u78ba\u8a8d\u5f85\u3061\u306e\u767b\u9332\u3092\u53d6\u308a\u6d88\u3059\u7528\u9014\u3082\u517c\u306d\u308b\u3002",
+                "tags": [
+                    "TwoFactorAuthentication"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "password": {
+                                        "type": "string",
+                                        "description": "current_password \u306f\u8a8d\u8a3c\u4e2d\u306e\u30e6\u30fc\u30b6\u30fc\u306e\u30cf\u30c3\u30b7\u30e5\u3068\u7167\u5408\u3059\u308b\uff08Hash::check \u76f8\u5f53\uff09\u3002\n\u30ac\u30fc\u30c9\u3092\u660e\u793a\u3059\u308b\u306e\u306f\u3001\u65e2\u5b9a\u30ac\u30fc\u30c9\u306b\u4f9d\u5b58\u3055\u305b\u306a\u3044\u305f\u3081\u3002auth:sanctum \u306f\u8a8d\u8a3c\u304c\n\u901a\u3063\u305f\u3068\u304d\u306b shouldUse('sanctum') \u3092\u547c\u3076\u304c\u3001\u305d\u308c\u306b\u983c\u308b\u3068\u8a8d\u8a3c\u306e\u8a2d\u5b9a\u3092\n\u5909\u3048\u305f\u3068\u304d\u306b\u7167\u5408\u5148\u304c\u9759\u304b\u306b\u305a\u308c\u308b\u3002"
+                                    }
+                                },
+                                "required": [
+                                    "password"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/auth/two-factor/recovery-codes": {
+            "post": {
+                "operationId": "twoFactorAuthentication.recoveryCodes",
+                "summary": "\u30ea\u30ab\u30d0\u30ea\u30b3\u30fc\u30c9\u3092\u4f5c\u308a\u76f4\u3059\u3002\u53e4\u3044\u30b3\u30fc\u30c9\u306f\u7121\u52b9\u306b\u306a\u308b\u3002",
+                "tags": [
+                    "TwoFactorAuthentication"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordConfirmationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "recovery_codes": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "recovery_codes"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                "Two factor authentication is not enabled."
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "http": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        },
+        "schemas": {
+            "AddProjectMemberRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "\u767b\u9332\u6e08\u307f\u306e\u30e6\u30fc\u30b6\u30fc\u3060\u3051\u3092\u62db\u5f85\u3067\u304d\u308b\uff08Jetstream \u306e AddTeamMember \u3068\u540c\u3058\uff09\u3002\n\u672a\u767b\u9332\u306e\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9\u306b\u306f 422 \u3092\u8fd4\u3059\u306e\u3067\u3001owner \u306b\u306f\u300c\u305d\u306e\u30a2\u30c9\u30ec\u30b9\u304c\n\u767b\u9332\u6e08\u307f\u304b\u300d\u304c\u5206\u304b\u308b\u3002\u767b\u9332\u6642\u306e unique \u691c\u8a3c\u3068\u540c\u3058\u6027\u8cea\u3067\u3001README \u306e\n\u300c\u6539\u5584\u4f59\u5730\u300d\uff08\u30e6\u30fc\u30b6\u30fc\u5217\u6319\uff09\u306b\u307e\u3068\u3081\u3066\u66f8\u304f\u3002"
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/ProjectRole"
+                    }
+                },
+                "required": [
+                    "email"
+                ],
+                "title": "AddProjectMemberRequest"
+            },
+            "ConfirmTwoFactorRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "TOTP \u306f6\u6841\u306e\u6570\u5b57\u3002digits \u306f\u300c\u6570\u5b57\u4ee5\u5916\u3092\u542b\u307e\u306a\u3044\u300d\u304b\u3064\u300c\u6841\u6570\u304c\u4e00\u81f4\u300d\u3092\n\u6587\u5b57\u5217\u3068\u3057\u3066\u898b\u308b\u306e\u3067\u3001\u5148\u982d\u304c 0 \u306e\u30b3\u30fc\u30c9\uff08\"012345\"\uff09\u3082\u901a\u308b\u3002\ninteger \u3084 numeric \u3092\u4ed8\u3051\u308b\u3068\u5148\u982d\u306e 0 \u304c\u843d\u3061\u308b\u305f\u3081\u4ed8\u3051\u306a\u3044\u3002"
+                    }
+                },
+                "required": [
+                    "code"
+                ],
+                "title": "ConfirmTwoFactorRequest"
+            },
+            "LoginRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "\u3053\u3053\u3067\u306f\u5f62\u5f0f\u3060\u3051\u898b\u308b\u3002Password::defaults() \u306f\u767b\u9332\u6642\u306e\u30dd\u30ea\u30b7\u30fc\u3067\u3042\u308a\u3001\n\u30ed\u30b0\u30a4\u30f3\u306b\u9069\u7528\u3059\u308b\u3068\u300c\u30dd\u30ea\u30b7\u30fc\u5f37\u5316\u524d\u306b\u767b\u9332\u3057\u305f\u65e2\u5b58\u30e6\u30fc\u30b6\u30fc\u304c\n\u6b63\u3057\u3044\u30d1\u30b9\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u3082\u5f3e\u304b\u308c\u308b\u300d\u3053\u3068\u306b\u306a\u308b\u3002"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "LoginRequest"
+            },
+            "PasswordConfirmationRequest": {
+                "type": "object",
+                "description": "MFA \u306e\u8a2d\u5b9a\u5909\u66f4\uff08\u6709\u52b9\u5316\u30fb\u89e3\u9664\u30fb\u30ea\u30ab\u30d0\u30ea\u30b3\u30fc\u30c9\u306e\u518d\u767a\u884c\uff09\u3067\u73fe\u5728\u306e\u30d1\u30b9\u30ef\u30fc\u30c9\u3092\u8981\u6c42\u3059\u308b\u3002\n\n\u30c8\u30fc\u30af\u30f3\u3060\u3051\u3067\u901a\u305b\u3066\u3057\u307e\u3046\u3068\u3001\u30c8\u30fc\u30af\u30f3\u3092\u76d7\u3093\u3060\u76f8\u624b\u304c MFA \u3092\u89e3\u9664\u3057\u3066\u6240\u6301\u8981\u7d20\u3092\u7121\u52b9\u5316\n\u3067\u304d\u308b\u3002MFA \u3092\u8db3\u3059\u76ee\u7684\u305d\u306e\u3082\u306e\u304c\u5d29\u308c\u308b\u305f\u3081\u3001\u8a2d\u5b9a\u5909\u66f4\u306f\u77e5\u8b58\u8981\u7d20\u3067\u518d\u78ba\u8a8d\u3059\u308b\u3002\n\u8ffd\u52a0\u306e\u30d1\u30b9\u30ef\u30fc\u30c9\u5165\u529b\u3092\u6c42\u3081\u308b\u64cd\u4f5c\u306f Laravel \u3082 password.confirm \u30df\u30c9\u30eb\u30a6\u30a7\u30a2\u3068\u3057\u3066\n\u6301\u3063\u3066\u304a\u308a\u3001\u30c8\u30fc\u30af\u30f3\u8a8d\u8a3c\u306e API \u3067\u306f\u305d\u306e\u5224\u5b9a\u3092\u5404\u30ea\u30af\u30a8\u30b9\u30c8\u306b\u7f6e\u304d\u63db\u3048\u308b\u5f62\u306b\u306a\u308b\u3002",
+                "properties": {
+                    "password": {
+                        "type": "string",
+                        "description": "current_password \u306f\u8a8d\u8a3c\u4e2d\u306e\u30e6\u30fc\u30b6\u30fc\u306e\u30cf\u30c3\u30b7\u30e5\u3068\u7167\u5408\u3059\u308b\uff08Hash::check \u76f8\u5f53\uff09\u3002\n\u30ac\u30fc\u30c9\u3092\u660e\u793a\u3059\u308b\u306e\u306f\u3001\u65e2\u5b9a\u30ac\u30fc\u30c9\u306b\u4f9d\u5b58\u3055\u305b\u306a\u3044\u305f\u3081\u3002auth:sanctum \u306f\u8a8d\u8a3c\u304c\n\u901a\u3063\u305f\u3068\u304d\u306b shouldUse('sanctum') \u3092\u547c\u3076\u304c\u3001\u305d\u308c\u306b\u983c\u308b\u3068\u8a8d\u8a3c\u306e\u8a2d\u5b9a\u3092\n\u5909\u3048\u305f\u3068\u304d\u306b\u7167\u5408\u5148\u304c\u9759\u304b\u306b\u305a\u308c\u308b\u3002"
+                    }
+                },
+                "required": [
+                    "password"
+                ],
+                "title": "PasswordConfirmationRequest"
+            },
+            "ProjectMemberResource": {
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/ProjectRole"
+                    },
+                    "joined_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "user_id",
+                    "name",
+                    "email",
+                    "role",
+                    "joined_at"
+                ],
+                "title": "ProjectMemberResource"
+            },
+            "ProjectResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/ProjectRole"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "role",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "ProjectResource"
+            },
+            "ProjectRole": {
+                "type": "string",
+                "description": "| |\n|---|\n| `owner` <br/> \u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u7ba1\u7406\u8005\u3002\u66f4\u65b0\u30fb\u524a\u9664\u30fb\u30e1\u30f3\u30d0\u30fc\u7ba1\u7406\u304c\u3067\u304d\u308b |\n| `member` <br/> \u53c2\u52a0\u8005\u3002\u30bf\u30b9\u30af\u306f\u64cd\u4f5c\u3067\u304d\u308b\u304c\u3001\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u81ea\u4f53\u306f\u5909\u66f4\u3067\u304d\u306a\u3044 |",
+                "enum": [
+                    "owner",
+                    "member"
+                ],
+                "title": "ProjectRole"
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "unique:users,email \u306f SELECT 1 FROM users WHERE email = ? \u3092\u767a\u884c\u3059\u308b\u3002\nusers.email \u306e UNIQUE \u5236\u7d04\u3068\u4e8c\u91cd\u306b\u306a\u308b\u304c\u3001\u3053\u3061\u3089\u306f 422 \u3067\u7406\u7531\u3092\u8fd4\u3059\u305f\u3081\u306e\u3082\u306e\u3002",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "confirmed \u306f password_confirmation \u3068\u306e\u4e00\u81f4\u3092\u691c\u8a3c\u3059\u308b"
+                    },
+                    "password_confirmation": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "email",
+                    "password",
+                    "password_confirmation"
+                ],
+                "title": "RegisterRequest"
+            },
+            "StoreProjectRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "\u30ab\u30e9\u30e0\u306f text \u3067\u9577\u3055\u306e\u4e0a\u9650\u304c\u7121\u3044\u3002\u4e0a\u9650\u3092\u7f6e\u304b\u306a\u3044\u3068\u30011\u4ef6\u3067\u5de8\u5927\u306a\u672c\u6587\u3092\n\u9001\u308a\u3064\u3051\u3066 DB \u3068\u5fdc\u7b54\u3092\u81a8\u3089\u307e\u305b\u3089\u308c\u308b\u3002",
+                        "maxLength": 5000
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "StoreProjectRequest"
+            },
+            "StoreTaskRequest": {
+                "type": "object",
+                "description": "\u6a29\u9650\u306e\u78ba\u8a8d\uff08authorize\uff09\u306f\u7f6e\u304b\u306a\u3044\u3002\u30bf\u30b9\u30af\u306e\u4f5c\u6210\u306f\u30e1\u30f3\u30d0\u30fc\u5168\u54e1\u304c\u3067\u304d\u3001\u30e1\u30f3\u30d0\u30fc\u3067\n\u3042\u308b\u3053\u3068\u306f {project} \u306e\u30d0\u30a4\u30f3\u30c7\u30a3\u30f3\u30b0\u304c\u4fdd\u8a3c\u3057\u3066\u3044\u308b\u3002",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 5000
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/TaskStatus"
+                    },
+                    "due_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "assignee_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "\u62c5\u5f53\u8005\u306f\u3053\u306e\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u30e1\u30f3\u30d0\u30fc\u306b\u9650\u308b\u3002users \u306b\u5b58\u5728\u3059\u308b\u3060\u3051\u3067\u306f\u8db3\u308a\u306a\u3044\u3002\n\u90e8\u5916\u8005\u3092\u62c5\u5f53\u306b\u3067\u304d\u308b\u3068\u3001\u305d\u306e\u30ab\u30fc\u30c9\u306b\u90e8\u5916\u8005\u306e\u540d\u524d\u304c\u51fa\u7d9a\u3051\u308b\u3002 SELECT count(*) FROM project_members WHERE user_id = ? AND project_id = ?\n\n\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u6761\u4ef6\u306f\u30af\u30ed\u30fc\u30b8\u30e3\u306b\u5305\u307f\u3001\u691c\u8a3c\u306e\u6642\u70b9\u3067\u521d\u3081\u3066\u8aad\u3080\u3002Scramble \u306f\nOpenAPI \u3092\u4f5c\u308b\u3068\u304d\u306b\u30ea\u30af\u30a8\u30b9\u30c8\u306e\u5916\u3067 rules() \u3092\u547c\u3076\u306e\u3067\u3001\u3053\u3053\u3067\n$this->route('project') \u3092\u76f4\u63a5\u8aad\u3080\u3068\uff08\u30eb\u30fc\u30c8\u304c\u7121\u304f null\uff09\u5931\u6557\u3059\u308b\u3002"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "title": "StoreTaskRequest"
+            },
+            "TaskResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/TaskStatus"
+                    },
+                    "due_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "date \u30ad\u30e3\u30b9\u30c8\u306e\u5024\u3092\u305d\u306e\u307e\u307e\u51fa\u3059\u3068 \"2026-10-05T00:00:00.000000Z\" \u306b\u306a\u308a\u3001\n\u53d7\u3051\u53d6\u3063\u305f\u5074\u306e\u30bf\u30a4\u30e0\u30be\u30fc\u30f3\u3067\u524d\u65e5\u306b\u305a\u308c\u3046\u308b\u3002\u65e5\u4ed8\u3060\u3051\u306e\u5024\u3068\u3057\u3066\u51fa\u3059\u3002"
+                    },
+                    "assignee": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "\u30ab\u30fc\u30c9\u306b\u62c5\u5f53\u8005\u306e\u540d\u524d\u3092\u51fa\u3059\u305f\u3081\u57cb\u3081\u8fbc\u3080\uff08GitHub \u306e Issue \u3082 assignee \u3092\u57cb\u3081\u8fbc\u3080\uff09\u3002\n\u30e1\u30fc\u30eb\u30a2\u30c9\u30ec\u30b9\u306f\u30e1\u30f3\u30d0\u30fc\u4e00\u89a7\u306b\u3042\u308b\u306e\u3067\u3001\u3053\u3053\u306b\u306f\u51fa\u3055\u306a\u3044\u3002",
+                        "properties": {
+                            "user_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "user_id",
+                            "name"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "title",
+                    "description",
+                    "status",
+                    "due_date",
+                    "assignee",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "TaskResource"
+            },
+            "TaskStatus": {
+                "type": "string",
+                "enum": [
+                    "todo",
+                    "in_progress",
+                    "done"
+                ],
+                "title": "TaskStatus"
+            },
+            "TwoFactorChallengeRequest": {
+                "type": "object",
+                "properties": {
+                    "challenge": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "\u8a8d\u8a3c\u30a2\u30d7\u30ea\u306e\u30b3\u30fc\u30c9\u3068\u30ea\u30ab\u30d0\u30ea\u30b3\u30fc\u30c9\u306f\u3001\u3069\u3061\u3089\u304b\u7247\u65b9\u3060\u3051\u3092\u53d7\u3051\u53d6\u308b\u3002\n\u4e21\u65b9\u6765\u305f\u3068\u304d\u306b\u3069\u3061\u3089\u3092\u512a\u5148\u3059\u308b\u304b\u3092\u6c7a\u3081\u305a\u306b\u6e08\u3080\u3088\u3046\u3001\u7d44\u307f\u5408\u308f\u305b\u3054\u3068\u5f3e\u304f\u3002"
+                    },
+                    "recovery_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "challenge"
+                ],
+                "title": "TwoFactorChallengeRequest"
+            },
+            "UpdateProjectMemberRequest": {
+                "type": "object",
+                "properties": {
+                    "role": {
+                        "$ref": "#/components/schemas/ProjectRole"
+                    }
+                },
+                "required": [
+                    "role"
+                ],
+                "title": "UpdateProjectMemberRequest"
+            },
+            "UpdateProjectRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 5000
+                    }
+                },
+                "title": "UpdateProjectRequest"
+            },
+            "UpdateTaskRequest": {
+                "type": "object",
+                "description": "\u6a29\u9650\u306e\u78ba\u8a8d\uff08authorize\uff09\u306f\u7f6e\u304b\u306a\u3044\u3002\u30bf\u30b9\u30af\u306e\u7de8\u96c6\u30fb\u30b9\u30c6\u30fc\u30bf\u30b9\u306e\u79fb\u52d5\u306f\u30e1\u30f3\u30d0\u30fc\u5168\u54e1\u304c\n\u3067\u304d\u308b\u3002",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 5000
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/TaskStatus"
+                    },
+                    "due_date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "assignee_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "title": "UpdateTaskRequest"
+            },
+            "UserResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "two_factor_enabled": {
+                        "type": "boolean",
+                        "description": "\u30b7\u30fc\u30af\u30ec\u30c3\u30c8\u3067\u306f\u306a\u304f\u300c\u6709\u52b9\u304b\u3069\u3046\u304b\u300d\u3060\u3051\u3092\u51fa\u3059\u3002\u8a2d\u5b9a\u753b\u9762\u306e\u8868\u793a\u3068\u3001\n\u89e3\u9664\u30dc\u30bf\u30f3\u3092\u51fa\u3059\u304b\u3069\u3046\u304b\u306e\u5224\u65ad\u306b\u5fc5\u8981\u306a\u60c5\u5831\u306f\u3053\u308c\u3067\u8db3\u308a\u308b\u3002"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "two_factor_enabled",
+                    "created_at"
+                ],
+                "title": "UserResource"
+            }
+        },
+        "responses": {
+            "ValidationException": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Errors overview."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "description": "A detailed description of each field that failed validation.",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "message",
+                                "errors"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthenticationException": {
+                "description": "Unauthenticated",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "ModelNotFoundException": {
+                "description": "Not found",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthorizationException": {
+                "description": "Authorization error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -4,9 +4,8 @@ namespace App\Actions\Project;
 
 use App\Models\Project;
 use App\Models\ProjectMember;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
  * メンバーを外す。owner が外す場合と、本人が抜ける場合の両方で使う。
@@ -22,7 +21,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 final class RemoveProjectMember
 {
     /**
-     * @throws HttpException 409 最後の owner を外そうとしたとき
+     * @throws ConflictHttpException 最後の owner を外そうとしたとき（409）
      */
     public function __invoke(ProjectMember $member): void
     {
@@ -31,11 +30,9 @@ final class RemoveProjectMember
 
             $member->refresh();
 
-            abort_if(
-                $member->isLastOwner(),
-                Response::HTTP_CONFLICT,
-                __('The last owner cannot leave the project.'),
-            );
+            if ($member->isLastOwner()) {
+                throw new ConflictHttpException(__('The last owner cannot leave the project.'));
+            }
 
             //   UPDATE tasks SET assignee_id = NULL, updated_at = ?
             //   WHERE project_id = ? AND assignee_id = ?
