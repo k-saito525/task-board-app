@@ -46,7 +46,7 @@ task-board-app/
 │   │   ├── Enums/              # TaskStatus, ProjectRole
 │   │   ├── Http/{Controllers/Api, Requests, Resources}/
 │   │   ├── Models/             # User, Project, ProjectMember, Task
-│   │   └── Policies/           # ProjectPolicy, TaskPolicy
+│   │   └── Policies/           # ProjectPolicy（メンバー管理・タスク削除も。可否が親のロールで決まるため）
 │   ├── database/migrations/
 │   ├── routes/api.php
 │   └── tests/Feature/
@@ -104,12 +104,11 @@ POST   /api/projects/{project}/members             owner のみ（登録済み�
 PATCH  /api/projects/{project}/members/{user}      owner のみ。{user} はユーザーの id
 DELETE /api/projects/{project}/members/{user}      owner、または本人（脱退）。最後の owner は 409
 
-GET    /api/projects/{project}/tasks?status=todo
-POST   /api/projects/{project}/tasks
+GET    /api/projects/{project}/tasks?status=todo   全件を { data: [...] } で（分割しない）。不正な status は 422
+POST   /api/projects/{project}/tasks               メンバー全員。担当者はメンバーに限る
 GET    /api/projects/{project}/tasks/{task}
-PATCH  /api/projects/{project}/tasks/{task}
-DELETE /api/projects/{project}/tasks/{task}
-PATCH  /api/projects/{project}/tasks/{task}/status
+PATCH  /api/projects/{project}/tasks/{task}        メンバー全員。ステータスの移動も { "status": ... } だけ送る
+DELETE /api/projects/{project}/tasks/{task}        owner のみ
 ```
 
 ## 設計方針
@@ -118,7 +117,7 @@ Laravel 公式が章立てで提供している専用クラスを主軸に据え
 
 | 責務 | 使う道具 |
 |---|---|
-| ルーティング | `Route::apiResource()->scopeBindings()` |
+| ルーティング | `Route::apiResource()->scoped()`（ネストしたリソースの親子照合） |
 | バリデーション | `FormRequest` |
 | 認可 | `Policy`。本文を受け取るものは `FormRequest::authorize()`、本文の無いものは `Gate::authorize()` で呼ぶ（非メンバーの排除は `{project}` のバインディング） |
 | レスポンス整形 | `JsonResource`（API Resource） |
@@ -127,9 +126,9 @@ Laravel 公式が章立てで提供している専用クラスを主軸に据え
 
 ### 設計上の要点
 
-1. **`scopeBindings()` による親子整合の検証** — `/projects/1/tasks/99` で task 99 が project 1 のものでなければ Laravel が自動で 404 を返す。IDOR 対策をルーティング層で担保する
+1. **`scoped()` による親子整合の検証** — `/projects/1/tasks/99` で task 99 が project 1 のものでなければ Laravel が自動で 404 を返す。IDOR 対策をルーティング層で担保する
 2. **所有権はクエリで縛る** — `Project::find($id)` ではなく `$request->user()->projects()->findOrFail($id)`。取得してから PHP で持ち主を判定する実装は、条件の書き漏れがそのまま情報漏洩になるため採らない
-3. **認可判定は Policy に集約** — ロールで可否を決めるのは `ProjectPolicy` / `TaskPolicy` のみ。呼び出しは、本文を受け取るものは `FormRequest::authorize()`（検証より先に走る）、本文の無いものは Controller の `Gate::authorize(...)`。`authorizeResource` は Laravel 11 以降の空の基底 Controller では動かない（内部で旧基底クラスの `middleware()` を使う）ため使わない
+3. **認可判定は Policy に集約** — ロールで可否を決めるのは `ProjectPolicy` のみ（タスク削除・メンバー管理も、可否が親のプロジェクトのロールで決まるのでここに置く。Jetstream の `TeamPolicy` と同じ置き方）。呼び出しは、本文を受け取るものは `FormRequest::authorize()`（検証より先に走る）、本文の無いものは Controller の `Gate::authorize(...)`。`authorizeResource` は Laravel 11 以降の空の基底 Controller では動かない（内部で旧基底クラスの `middleware()` を使う）ため使わない
 4. **API Resource + `whenLoaded()`** — リレーションが読み込み済みのときだけ出力し N+1 を防ぐ。`paginate()` と組めばページネーションのメタが自動で付く
 5. **トークンの有効期限** — `config/sanctum.php` の `expiration` を設定する。トークンは DB にあるため個別失効が可能
 6. **出力は許可リストで固定する** — API Resource に出すフィールドだけを列挙する。モデルの `#[Hidden]`（拒否リスト）はカラム追加のたびに書き足す必要があるが、Resource は書いていない項目が出ない。`two_factor_secret` のような値を取りこぼさない
@@ -162,7 +161,7 @@ App Router の Server Components を主軸にデータを取得し、変更は S
 
 ## 画面
 
-タスクは todo / in_progress / done の3カラムで表示し、カード上のボタンでステータスを移動する（`PATCH .../status` 1本）。ドラッグ&ドロップは並び順を保存する `position` カラムの採番設計が必要になるため、MVP 完成後の拡張とする。
+タスクは todo / in_progress / done の3カラムで表示し、カード上のボタンでステータスを移動する（`PATCH .../tasks/{task}` に `status` だけを送る）。ドラッグ&ドロップは並び順を保存する `position` カラムの採番設計が必要になるため、MVP 完成後の拡張とする。
 
 ## スコープ外（README の「改善余地」に明記する）
 

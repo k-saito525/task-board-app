@@ -7,9 +7,9 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 ## 現在地
 
 - **完了**: Step 0 / 1 / 2 / 3（基本認証・MFA・レート制限・ログインの2段階化。3b と 3c-1 は**実機確認済み**） / 4（プロジェクト CRUD。**実機確認済み**）
-- **次の作業**: **Step 5 の実機確認**（curl。member の 403、最後の owner の 409、本人の脱退を確かめる）。済んだら Step 6 へ
-- **テスト**: 93 passed / 396 assertions（`docker compose exec api php artisan test`）
-- **リポジトリ**: `main` と `origin/main` は同期済み。Step 4 は feat `cc5377f` / test `8dff014` / docs、Step 5 は feat `20d7995` / test `13cc45f` / docs の各3コミット（Step 5 は実機確認の前にコミット）
+- **次の作業**: **Step 5・6 の実機確認**（curl）。Step 5 の手順はチャットで提示済み、Step 6 の手順はこれから提示。並行して Step 7（OpenAPI + TS 型生成）に進める
+- **テスト**: 113 passed / 485 assertions（`docker compose exec api php artisan test`）
+- **リポジトリ**: `main` と `origin/main` は同期済み。Step 5 は feat `20d7995` / test `13cc45f` / docs、Step 6 は feat `270bf85` / test `17ad125` / docs の各3コミット（どちらも実機確認の前にコミット）
 
 まだ存在しないもの: `web/`（Next.js）、`.github/workflows/`、README の本文。
 
@@ -28,7 +28,7 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | 3c-1 | 　└ チャレンジ → 本トークン発行 | ✅ 完了 | TOTP / リカバリコードの検証を通ると本トークンが出る。コードは使い回せない | [step-03](./worklog/step-03-authentication.md#3c-1-引換券と本トークンの発行) |
 | 4 | プロジェクト CRUD + Policy | ✅ 完了 | 非メンバーからのアクセスが 404 | [step-04](./worklog/step-04-projects.md) |
 | 5 | メンバー管理 + ロール認可 | 🚧 実機確認待ち | member ロールが更新/削除で 403、最後の owner を外せない | [step-05](./worklog/step-05-members.md) |
-| 6 | タスク CRUD + scopeBindings | ⬜ 未着手 | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | — |
+| 6 | タスク CRUD + scoped | 🚧 実機確認待ち | 他プロジェクトの task id を混ぜると 404、`?status=` が効く | [step-06](./worklog/step-06-tasks.md) |
 | 7 | OpenAPI + TS 型生成 | ⬜ 未着手 | `/docs/api` が開ける、`schema.d.ts` が生成される | — |
 | 8 | Next.js 雛形 + BFF 認証 | ⬜ 未着手 | ブラウザで register → login、リロードで維持、JS からトークンが見えない | — |
 | 9 | プロジェクト一覧・作成 UI | ⬜ 未着手 | ブラウザでプロジェクト CRUD が一通り動く | — |
@@ -53,6 +53,8 @@ task-board-app の実装進捗。作業は小さく区切り、ステップ完�
 | レート制限 | 全体 60回/分、パスワード検証 10回/分、コード検証 5回/分＋30回/日。認証済みはユーザー単位、未認証は IP 単位で数える。ログインの2段階目は引換券の持ち主（ユーザー）単位 |
 | ログインの2段階化 | 引換券はランダムな ID ＋ キャッシュの控え（5分・1回きり）。コードの空白は取り除く。TOTP は最後に通ったステップを保存して使い回しを塞ぐ |
 | 認可 | 非メンバーは `{project}` のバインディングを参加プロジェクトに絞って 404。ロールの判定は Policy。呼び出しは本文ありなら `FormRequest::authorize()`（検証より先）、本文なしなら `Gate::authorize()` |
+| タスク | 作成・編集・移動はメンバー全員、削除は owner。担当者はメンバーに限り、メンバーを外すと担当も外す。一覧は全件、ステータスの移動は通常の PATCH |
+| 仕様の判断 | Step 6 以降は Claude に一任。最新の実務の主流・本プロジェクトへの適合・標準的なセキュリティで決め、根拠と見送った案を worklog に残す |
 | 型共有 | Scramble で OpenAPI 生成 → `openapi-typescript` で TS 型生成 |
 | API 設計 | Laravel 公式の道具が主軸（`apiResource` + `scopeBindings` / FormRequest / Policy / API Resource）＋ 複数ステップ処理のみ Action クラス |
 | ボード UI | 3カラム＋ボタンでステータス移動（D&D は完成後の拡張） |

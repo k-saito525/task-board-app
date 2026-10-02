@@ -43,7 +43,7 @@ curl -i localhost:8000/api/health                     # DB 接続込みの生存
 
 | 責務 | 使う道具 |
 |---|---|
-| ルーティング | `Route::apiResource()->scopeBindings()` |
+| ルーティング | `Route::apiResource()->scoped()`（ネストしたリソースの親子照合） |
 | バリデーション | `FormRequest` |
 | 認可 | `Policy`。本文を受け取るものは `FormRequest::authorize()`、本文の無いものは `Gate::authorize()` で呼ぶ（非メンバーの排除は `{project}` のバインディング） |
 | レスポンス整形 | `JsonResource`（API Resource） |
@@ -55,7 +55,7 @@ curl -i localhost:8000/api/health                     # DB 接続込みの生存
 - **クエリでスコープする。** `Project::find($id)` は使わない。`$request->user()->projects()->findOrFail($id)` のようにリレーション経由で辿り、所有権を SQL 側で縛る。取得してから PHP で持ち主を確認する書き方はしない。URL の `{project}` は `AppServiceProvider::configureRouteBindings()` でこの形に差し替えてあり、非メンバーは 404 になる
 - **認可判定は Policy に集約する。** ロールで可否を決めるのは Policy だけ（Resource が `pivot->role` を表示用に出すのは可）。呼び出しは、本文を受け取るエンドポイントでは `FormRequest::authorize()`（入力の検証より先に走る。コントローラで呼ぶと検証の後になり、権限の無い人にも 422 の中身が見える）、本文の無いものでは Controller の `Gate::authorize(...)`。`authorizeResource` は Laravel 11 以降の空の基底 Controller では動かないので使わない
 - **一覧は常に `{"data": [...]}` で返す。** `JsonResource::withoutWrapping()` を入れているので、ページ分けしないコレクションは手で `data` に包む
-- **ネストしたリソースには `scopeBindings()` を付ける。** `/projects/{project}/tasks/{task}` で親子関係が壊れたリクエストを Laravel に 404 させる（IDOR 対策）
+- **ネストしたリソースには `->scoped()` を付ける。** `/projects/{project}/tasks/{task}` で親子関係が壊れたリクエストを Laravel に 404 させる（IDOR 対策）。リソースルートに `scopeBindings()` は無い。`scoped()` に何も渡さなければ id で、`scoped(['member' => 'user_id'])` なら指定した列で、親のリレーション経由で探す
 - **起こり得ない入力へのガードは書かない。** 型と契約を信じる
 
 ## ドキュメントの書き方
